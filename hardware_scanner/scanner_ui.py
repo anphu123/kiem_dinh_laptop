@@ -1,40 +1,175 @@
 """
 O2O Laptop Inspection - Hardware Scanner UI
-Giao diện đồ họa: quét cấu hình + hiển thị kết quả + QR Code trong 1 cửa sổ.
+Tab 1: Cấu hình phần cứng (auto-scan)
+Tab 2: Checklist kiểm định ngoại quan (trắc nghiệm)
+Panel phải: Grade + QR Code
 """
 
 import tkinter as tk
 from tkinter import ttk
 import threading
 import json
-import io
 import os
 import tempfile
 import platform
 from datetime import datetime
 
-import scanner  # module logic chính
+import scanner
+
+# ── Màu sắc ─────────────────────────────────────────────────────────────────
+BG       = "#0F1117"
+CARD     = "#1A1D27"
+CARD2    = "#222536"
+BORDER   = "#2A2D3E"
+ACCENT   = "#4F8EF7"
+GREEN    = "#00D4AA"
+YELLOW   = "#F5A623"
+RED      = "#E74C3C"
+PURPLE   = "#9B59B6"
+TEXT     = "#E8EAED"
+DIM      = "#6B7280"
+WHITE    = "#FFFFFF"
+
+FT = ("Segoe UI", 20, "bold")
+FH = ("Segoe UI", 11, "bold")
+FB = ("Segoe UI", 10)
+FM = ("Consolas", 10)
+FS = ("Segoe UI", 9)
+FBG = ("Segoe UI", 42, "bold")
+
+# ── Bộ câu hỏi kiểm định ─────────────────────────────────────────────────────
+CHECKLIST = [
+    {
+        "id": "power", "icon": "⚡", "category": "NGUỒN & KHỞI ĐỘNG",
+        "question": "Máy có khởi động được không?",
+        "options": [
+            {"label": "Khởi động bình thường",          "score": 0},
+            {"label": "Khởi động chậm / lỗi phần mềm", "score": 2},
+            {"label": "Chết nguồn hoàn toàn",           "score": 0, "red_flag": True},
+        ],
+    },
+    {
+        "id": "bios", "icon": "🔒", "category": "BIOS / BITLOCKER",
+        "question": "Tình trạng khóa BIOS / BitLocker?",
+        "options": [
+            {"label": "Không khóa",                          "score": 0},
+            {"label": "Khóa BitLocker (có thể mở được)",     "score": 0, "red_flag": True},
+            {"label": "Khóa BIOS (không tháo được)",         "score": 0, "red_flag": True},
+        ],
+    },
+    {
+        "id": "screen", "icon": "🖥", "category": "MÀN HÌNH",
+        "question": "Tình trạng màn hình?",
+        "options": [
+            {"label": "Hoàn hảo, không tì vết",              "score": 0},
+            {"label": "Trầy nhẹ, không ảnh hưởng hiển thị", "score": 1},
+            {"label": "Trầy nhiều / điểm chết pixel",        "score": 4},
+            {"label": "Chảy mực / nứt vỡ",                   "score": 0, "red_flag": True},
+        ],
+    },
+    {
+        "id": "chassis", "icon": "📦", "category": "VỎ MÁY",
+        "question": "Tình trạng vỏ máy (nắp, đáy, viền)?",
+        "options": [
+            {"label": "Nguyên vẹn",            "score": 0},
+            {"label": "Trầy nhẹ",              "score": 1},
+            {"label": "Móp / nứt nhẹ",         "score": 3},
+            {"label": "Vỡ / biến dạng nặng",  "score": 7},
+        ],
+    },
+    {
+        "id": "keyboard", "icon": "⌨", "category": "BÀN PHÍM",
+        "question": "Tình trạng bàn phím?",
+        "options": [
+            {"label": "Đầy đủ, hoạt động tốt",          "score": 0},
+            {"label": "Mòn phím / bẩn nhẹ",             "score": 1},
+            {"label": "Mất hoặc liệt 1-2 phím",         "score": 3},
+            {"label": "Liệt nhiều phím / không dùng được", "score": 7},
+        ],
+    },
+    {
+        "id": "hinge", "icon": "🔩", "category": "BẢN LỀ",
+        "question": "Tình trạng bản lề màn hình?",
+        "options": [
+            {"label": "Chắc chắn, mở đóng mượt", "score": 0},
+            {"label": "Hơi lỏng",                "score": 1},
+            {"label": "Lỏng nhiều / kêu",        "score": 3},
+            {"label": "Gãy / vỡ bản lề",         "score": 7},
+        ],
+    },
+    {
+        "id": "touchpad", "icon": "🖱", "category": "TOUCHPAD",
+        "question": "Tình trạng touchpad?",
+        "options": [
+            {"label": "Nhạy, hoạt động tốt",  "score": 0},
+            {"label": "Giật / kém nhạy nhẹ",  "score": 2},
+            {"label": "Không hoạt động",       "score": 4},
+        ],
+    },
+    {
+        "id": "ports", "icon": "🔌", "category": "CỔNG KẾT NỐI",
+        "question": "Tình trạng cổng USB / HDMI / jack?",
+        "options": [
+            {"label": "Tất cả hoạt động",       "score": 0},
+            {"label": "Hỏng 1 cổng phụ",        "score": 1},
+            {"label": "Hỏng 2+ cổng",           "score": 3},
+        ],
+    },
+    {
+        "id": "camera", "icon": "📷", "category": "CAMERA & MIC",
+        "question": "Tình trạng camera tích hợp?",
+        "options": [
+            {"label": "Hoạt động tốt",   "score": 0},
+            {"label": "Chất lượng kém",  "score": 1},
+            {"label": "Không hoạt động", "score": 2},
+        ],
+    },
+    {
+        "id": "speaker", "icon": "🔊", "category": "LOA & ÂM THANH",
+        "question": "Tình trạng loa?",
+        "options": [
+            {"label": "Âm thanh to, rõ",    "score": 0},
+            {"label": "Rè / méo tiếng nhẹ", "score": 1},
+            {"label": "Không có âm thanh",  "score": 2},
+        ],
+    },
+]
+
+GRADE_TABLE = [
+    (0,  2,  "A",      GREEN,  "Máy tốt — Thu mua / bán ra giá cao"),
+    (3,  5,  "B",      ACCENT, "Máy khá — Giá trung bình"),
+    (6,  9,  "C",      YELLOW, "Máy trung bình — Giảm giá"),
+    (10, 99, "D",      RED,    "Máy yếu — Giảm sâu / linh kiện"),
+]
 
 
-# ── Bảng màu ────────────────────────────────────────────────────────────────
-BG        = "#0F1117"   # nền tổng
-CARD      = "#1A1D27"   # nền card
-BORDER    = "#2A2D3E"   # viền card
-ACCENT    = "#4F8EF7"   # xanh dương chính
-ACCENT2   = "#00D4AA"   # xanh lá nhấn (pin tốt)
-WARN      = "#F5A623"   # vàng (pin trung)
-DANGER    = "#E74C3C"   # đỏ (pin yếu / lỗi)
-TEXT      = "#E8EAED"   # text chính
-TEXT_DIM  = "#6B7280"   # text mờ
-TEXT_HEAD = "#FFFFFF"   # tiêu đề
+def calc_grade(answers: dict):
+    """Tính điểm và xếp hạng từ dict {question_id: option_index}."""
+    total = 0
+    red_flags = []
 
-FONT_TITLE  = ("Segoe UI", 20, "bold")
-FONT_HEAD   = ("Segoe UI", 11, "bold")
-FONT_BODY   = ("Segoe UI", 10)
-FONT_MONO   = ("Consolas", 10)
-FONT_SMALL  = ("Segoe UI", 9)
-FONT_BIG    = ("Segoe UI", 36, "bold")
+    for item in CHECKLIST:
+        qid = item["id"]
+        idx = answers.get(qid)
+        if idx is None:
+            continue
+        opt = item["options"][idx]
+        if opt.get("red_flag"):
+            red_flags.append(f'{item["icon"]} {item["category"]}: {opt["label"]}')
+        else:
+            total += opt["score"]
 
+    if red_flags:
+        return "REJECT", total, RED, "Có lỗi nghiêm trọng — Từ chối", red_flags
+
+    for lo, hi, grade, color, desc in GRADE_TABLE:
+        if lo <= total <= hi:
+            return grade, total, color, desc, []
+
+    return "D", total, RED, "Máy yếu — Giảm sâu / linh kiện", []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 class ScannerApp(tk.Tk):
     def __init__(self):
@@ -43,250 +178,242 @@ class ScannerApp(tk.Tk):
         self.configure(bg=BG)
         self.resizable(True, True)
 
-        # Center cửa sổ
-        w, h = 1100, 700
+        w, h = 1160, 740
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
         self.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
-        self.minsize(900, 600)
+        self.minsize(960, 640)
 
-        self._data = None
-        self._qr_img = None  # PhotoImage giữ reference
+        self._data     = None
+        self._qr_img   = None
+        self._answers  = {}          # {qid: option_idx}
+        self._vars     = {}          # {qid: IntVar}
 
         self._build_header()
         self._build_body()
         self._build_footer()
 
-        # Bắt đầu scan sau khi UI render xong
         self.after(200, self._start_scan)
 
-    # ── Layout ──────────────────────────────────────────────────────────────
+    # ── Header ───────────────────────────────────────────────────────────────
 
     def _build_header(self):
-        hdr = tk.Frame(self, bg=CARD, pady=14)
+        hdr = tk.Frame(self, bg=CARD, pady=12)
         hdr.pack(fill="x")
 
         tk.Label(hdr, text="O2O  LAPTOP  INSPECTION",
-                 font=FONT_TITLE, fg=TEXT_HEAD, bg=CARD).pack(side="left", padx=24)
+                 font=FT, fg=WHITE, bg=CARD).pack(side="left", padx=24)
 
-        self._lbl_time = tk.Label(hdr, text="", font=FONT_SMALL,
-                                   fg=TEXT_DIM, bg=CARD)
+        self._lbl_time = tk.Label(hdr, text="", font=FS, fg=DIM, bg=CARD)
         self._lbl_time.pack(side="right", padx=24)
 
-        sep = tk.Frame(self, bg=ACCENT, height=2)
-        sep.pack(fill="x")
+        tk.Frame(self, bg=ACCENT, height=2).pack(fill="x")
+
+    # ── Body ─────────────────────────────────────────────────────────────────
 
     def _build_body(self):
         body = tk.Frame(self, bg=BG)
-        body.pack(fill="both", expand=True, padx=16, pady=12)
+        body.pack(fill="both", expand=True, padx=14, pady=10)
         body.columnconfigure(0, weight=3)
         body.columnconfigure(1, weight=2)
         body.rowconfigure(0, weight=1)
 
-        # ── Cột trái: thông tin phần cứng ──
-        self._left = tk.Frame(body, bg=BG)
-        self._left.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        # ── Trái: Notebook 2 tab ──
+        nb_frame = tk.Frame(body, bg=BG)
+        nb_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        nb_frame.rowconfigure(0, weight=1)
+        nb_frame.columnconfigure(0, weight=1)
 
-        # ── Cột phải: QR Code ──
-        self._right = tk.Frame(body, bg=CARD, bd=0,
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Dark.TNotebook",
+                        background=BG, borderwidth=0, tabmargins=0)
+        style.configure("Dark.TNotebook.Tab",
+                        background=CARD, foreground=DIM,
+                        padding=[16, 7], font=FH, borderwidth=0)
+        style.map("Dark.TNotebook.Tab",
+                  background=[("selected", CARD2)],
+                  foreground=[("selected", WHITE)])
+
+        self._nb = ttk.Notebook(nb_frame, style="Dark.TNotebook")
+        self._nb.grid(row=0, column=0, sticky="nsew")
+
+        # Tab 1: Cấu hình
+        self._tab_hw = tk.Frame(self._nb, bg=BG)
+        self._nb.add(self._tab_hw, text="  📊  CẤU HÌNH  ")
+
+        # Tab 2: Checklist
+        self._tab_cl = tk.Frame(self._nb, bg=BG)
+        self._nb.add(self._tab_cl, text="  ✅  KIỂM ĐỊNH  ")
+
+        # ── Phải: Grade + QR ──
+        self._right = tk.Frame(body, bg=CARD,
                                 highlightthickness=1,
                                 highlightbackground=BORDER)
         self._right.grid(row=0, column=1, sticky="nsew")
 
         self._build_loading_state()
+        self._build_checklist()
+
+    # ── Footer ───────────────────────────────────────────────────────────────
 
     def _build_footer(self):
-        sep = tk.Frame(self, bg=BORDER, height=1)
-        sep.pack(fill="x")
-
-        foot = tk.Frame(self, bg=CARD, pady=8)
+        tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
+        foot = tk.Frame(self, bg=CARD, pady=7)
         foot.pack(fill="x")
 
         self._status = tk.Label(foot, text="Đang khởi động...",
-                                 font=FONT_SMALL, fg=TEXT_DIM, bg=CARD)
+                                 font=FS, fg=DIM, bg=CARD)
         self._status.pack(side="left", padx=20)
 
         self._btn_rescan = tk.Button(
-            foot, text="⟳  Quét lại", font=FONT_SMALL,
-            bg=ACCENT, fg=TEXT_HEAD, activebackground="#3A6ED8",
+            foot, text="⟳  Quét lại", font=FS,
+            bg=ACCENT, fg=WHITE, activebackground="#3A6ED8",
             relief="flat", padx=14, pady=4, cursor="hand2",
-            command=self._start_scan
+            command=self._start_scan, state="disabled"
         )
         self._btn_rescan.pack(side="right", padx=16)
-        self._btn_rescan.config(state="disabled")
 
-    # ── Loading state ────────────────────────────────────────────────────────
+    # ── Loading ───────────────────────────────────────────────────────────────
 
     def _build_loading_state(self):
-        """Xóa nội dung cũ, hiển thị spinner text."""
-        for w in self._left.winfo_children():
+        for w in self._tab_hw.winfo_children():
             w.destroy()
         for w in self._right.winfo_children():
             w.destroy()
 
-        center = tk.Frame(self._left, bg=BG)
+        center = tk.Frame(self._tab_hw, bg=BG)
         center.place(relx=0.5, rely=0.5, anchor="center")
 
-        self._spinner_label = tk.Label(center, text="⬤", font=FONT_BIG,
-                                        fg=ACCENT, bg=BG)
+        self._spinner_label = tk.Label(center, text="◐", font=FBG, fg=ACCENT, bg=BG)
         self._spinner_label.pack()
-
-        self._scan_label = tk.Label(center, text="Đang quét cấu hình máy...",
-                                     font=FONT_HEAD, fg=TEXT, bg=BG)
-        self._scan_label.pack(pady=(12, 0))
-
-        self._progress_lbl = tk.Label(center, text="",
-                                       font=FONT_SMALL, fg=TEXT_DIM, bg=BG)
+        tk.Label(center, text="Đang quét cấu hình máy...",
+                 font=FH, fg=TEXT, bg=BG).pack(pady=(12, 0))
+        self._progress_lbl = tk.Label(center, text="", font=FS, fg=DIM, bg=BG)
         self._progress_lbl.pack(pady=(4, 0))
-
         self._animate_spinner()
 
-        # QR placeholder
         tk.Label(self._right, text="QR", font=("Segoe UI", 48, "bold"),
                  fg=BORDER, bg=CARD).place(relx=0.5, rely=0.5, anchor="center")
 
     def _animate_spinner(self, step=0):
-        chars = ["◐", "◓", "◑", "◒"]
+        frames = ["◐", "◓", "◑", "◒"]
         if hasattr(self, "_spinner_label") and self._spinner_label.winfo_exists():
-            self._spinner_label.config(text=chars[step % len(chars)])
-            self._anim_id = self.after(200, self._animate_spinner, step + 1)
+            self._spinner_label.config(text=frames[step % 4])
+            self._anim_id = self.after(180, self._animate_spinner, step + 1)
 
-    # ── Scan thread ──────────────────────────────────────────────────────────
+    # ── Scan ─────────────────────────────────────────────────────────────────
 
     def _start_scan(self):
         self._btn_rescan.config(state="disabled")
         self._build_loading_state()
-        self._set_status("Đang thu thập dữ liệu...")
+        self._status.config(text="Đang thu thập dữ liệu...")
         threading.Thread(target=self._run_scan, daemon=True).start()
 
     def _run_scan(self):
         steps = [
-            ("Thông tin hệ thống...", scanner.get_system_info),
-            ("CPU...",               scanner.get_cpu_info),
-            ("RAM...",               scanner.get_ram_info),
-            ("Ổ cứng...",            scanner.get_storage_info),
-            ("Pin...",               scanner.get_battery_info),
-            ("Card đồ họa...",       scanner.get_gpu_info),
-            ("Màn hình...",          scanner.get_display_info),
+            ("Thông tin hệ thống...", "system",  scanner.get_system_info),
+            ("CPU...",               "cpu",     scanner.get_cpu_info),
+            ("RAM...",               "ram",     scanner.get_ram_info),
+            ("Ổ cứng...",            "storage", scanner.get_storage_info),
+            ("Pin...",               "battery", scanner.get_battery_info),
+            ("Card đồ họa...",       "gpu",     scanner.get_gpu_info),
+            ("Màn hình...",          "display", scanner.get_display_info),
         ]
-        keys   = ["system", "cpu", "ram", "storage", "battery", "gpu", "display"]
         result = {"scan_timestamp": datetime.now().isoformat()}
-
-        for (msg, fn), key in zip(steps, keys):
-            self.after(0, lambda m=msg: self._update_progress(m))
+        for msg, key, fn in steps:
+            self.after(0, lambda m=msg: self._progress_lbl.config(text=m)
+                       if self._progress_lbl.winfo_exists() else None)
             result[key] = fn()
 
         self._data = result
         self.after(0, self._on_scan_done)
 
-    def _update_progress(self, msg):
-        if hasattr(self, "_progress_lbl") and self._progress_lbl.winfo_exists():
-            self._progress_lbl.config(text=msg)
-
     def _on_scan_done(self):
         if hasattr(self, "_anim_id"):
             self.after_cancel(self._anim_id)
-
-        self._render_results(self._data)
-        self._render_qr(self._data)
-        self._set_status(
-            f"Hoàn tất lúc {datetime.now().strftime('%H:%M:%S')}  •  "
-            f"Serial: {self._data['system'].get('serial_number', 'N/A')}"
-        )
+        self._render_hw(self._data)
+        self._refresh_right()
         ts = self._data["scan_timestamp"][:19].replace("T", " ")
         self._lbl_time.config(text=ts)
+        sn = self._data["system"].get("serial_number", "N/A")
+        self._status.config(
+            text=f"Hoàn tất lúc {datetime.now().strftime('%H:%M:%S')}  •  Serial: {sn}")
         self._btn_rescan.config(state="normal")
 
-    # ── Render kết quả ───────────────────────────────────────────────────────
+    # ── Tab 1: Phần cứng ─────────────────────────────────────────────────────
 
-    def _render_results(self, data):
-        for w in self._left.winfo_children():
+    def _render_hw(self, data):
+        for w in self._tab_hw.winfo_children():
             w.destroy()
 
-        canvas = tk.Canvas(self._left, bg=BG, highlightthickness=0)
-        scroll = ttk.Scrollbar(self._left, orient="vertical", command=canvas.yview)
-        frame  = tk.Frame(canvas, bg=BG)
-
+        canvas = tk.Canvas(self._tab_hw, bg=BG, highlightthickness=0)
+        sb = ttk.Scrollbar(self._tab_hw, orient="vertical", command=canvas.yview)
+        frame = tk.Frame(canvas, bg=BG)
         frame.bind("<Configure>",
                    lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.create_window((0, 0), window=frame, anchor="nw")
-        canvas.configure(yscrollcommand=scroll.set)
-
+        canvas.configure(yscrollcommand=sb.set)
         canvas.pack(side="left", fill="both", expand=True)
-        scroll.pack(side="right", fill="y")
+        sb.pack(side="right", fill="y")
         canvas.bind_all("<MouseWheel>",
                         lambda e: canvas.yview_scroll(-1*(e.delta//120), "units"))
 
-        s = data["system"]
-        cpu = data["cpu"]
-        ram = data["ram"]
+        s    = data["system"]
+        cpu  = data["cpu"]
+        ram  = data["ram"]
         batt = data["battery"]
         disks = data["storage"]
+        gpus  = data.get("gpu", [])
 
-        # ── Hệ thống ──
-        self._section(frame, "💻  THÔNG TIN MÁY")
+        self._sec(frame, "💻  THÔNG TIN MÁY")
         self._row(frame, "Hãng",   s.get("manufacturer", "—"))
-        self._row(frame, "Model",  s.get("model", "—"), bold=True)
-        self._row(frame, "Serial", s.get("serial_number", "—"),
-                  mono=True, accent=True)
-        self._row(frame, "BIOS",   s.get("bios_version", "—"), dim=True)
-        self._row(frame, "OS",     s.get("os", "—") + " " + s.get("os_version", "")[:40],
-                  dim=True)
+        self._row(frame, "Model",  s.get("model", "—"),           bold=True)
+        self._row(frame, "Serial", s.get("serial_number", "—"),   mono=True, color=ACCENT)
+        self._row(frame, "BIOS",   s.get("bios_version", "—"),    dim=True)
+        self._row(frame, "OS",
+                  s.get("os", "—") + "  " + s.get("os_version", "")[:40], dim=True)
 
-        # ── CPU ──
-        self._section(frame, "🔲  CPU")
+        self._sec(frame, "🔲  CPU")
         self._row(frame, "Tên", cpu.get("name", "—"), bold=True)
-        cores_str = (f"{cpu.get('physical_cores', '?')} lõi vật lý  /  "
-                     f"{cpu.get('logical_cores', '?')} luồng  •  "
-                     f"{cpu.get('max_freq_ghz', '?')} GHz")
-        self._row(frame, "Cores", cores_str)
+        self._row(frame, "Cores",
+                  f"{cpu.get('physical_cores','?')} lõi vật lý  /  "
+                  f"{cpu.get('logical_cores','?')} luồng  •  "
+                  f"{cpu.get('max_freq_ghz','?')} GHz")
 
-        # ── RAM ──
-        self._section(frame, "📦  RAM")
-        self._row(frame, "Tổng", f"{ram.get('total_gb', '?')} GB", bold=True)
-        for i, slot in enumerate(ram.get("slots", []), 1):
-            val = (f"{slot['capacity_gb']} GB  {slot['type']}  "
-                   f"{slot['speed_mhz']} MHz  ({slot['manufacturer']})")
-            self._row(frame, f"Khe {i}", val)
+        self._sec(frame, "📦  RAM")
+        self._row(frame, "Tổng", f"{ram.get('total_gb','?')} GB", bold=True)
+        for i, sl in enumerate(ram.get("slots", []), 1):
+            self._row(frame, f"Khe {i}",
+                      f"{sl['capacity_gb']} GB  {sl['type']}  "
+                      f"{sl['speed_mhz']} MHz  ({sl['manufacturer']})")
 
-        # ── Ổ cứng ──
-        self._section(frame, "💾  Ổ CỨNG")
+        self._sec(frame, "💾  Ổ CỨNG")
         if disks:
-            for disk in disks:
-                val = f"{disk['size_gb']} GB  •  {disk['interface']}"
-                self._row(frame, disk["name"], val)
+            for d in disks:
+                self._row(frame, d["name"], f"{d['size_gb']} GB  •  {d['interface']}")
         else:
             self._row(frame, "—", "Không phát hiện ổ cứng", dim=True)
 
-        # ── Card đồ họa ──
-        gpus = data.get("gpu", [])
-        self._section(frame, "🎮  CARD ĐỒ HỌA")
+        self._sec(frame, "🎮  CARD ĐỒ HỌA")
         if gpus:
-            for gpu in gpus:
-                name = gpu.get("name", "Unknown")
+            for g in gpus:
                 parts = []
-                if gpu.get("vram_gb"):
-                    parts.append(f"{gpu['vram_gb']} GB VRAM")
-                elif gpu.get("vram_mb"):
-                    parts.append(f"{gpu['vram_mb']} MB VRAM")
-                gpu_type = gpu.get("type", "")
-                if gpu_type:
-                    parts.append(gpu_type)
-                if gpu.get("resolution"):
-                    parts.append(gpu["resolution"])
-                val = "  •  ".join(parts) if parts else "—"
-                type_color = ACCENT if gpu_type == "Dedicated" else (ACCENT2 if gpu_type == "Integrated" else TEXT)
-                self._row(frame, name, val, color=type_color if gpu_type == "Dedicated" else None)
+                if g.get("vram_gb"):   parts.append(f"{g['vram_gb']} GB VRAM")
+                elif g.get("vram_mb"): parts.append(f"{g['vram_mb']} MB VRAM")
+                if g.get("type"):      parts.append(g["type"])
+                if g.get("resolution"): parts.append(g["resolution"])
+                c = ACCENT if g.get("type") == "Dedicated" else None
+                self._row(frame, g.get("name","?"),
+                          "  •  ".join(parts) or "—", color=c)
         else:
             self._row(frame, "—", "Không phát hiện GPU", dim=True)
 
-        # ── Pin ──
-        self._section(frame, "🔋  PIN")
+        self._sec(frame, "🔋  PIN")
         if batt.get("present"):
-            health = batt.get("health_percent")
-            if health is not None:
-                color = ACCENT2 if health >= 80 else (WARN if health >= 60 else DANGER)
-                icon  = "●" if health >= 80 else ("●" if health >= 60 else "●")
-                self._row(frame, "Sức khỏe", f"{health}%", color=color, bold=True)
+            h = batt.get("health_percent")
+            if h is not None:
+                hc = GREEN if h >= 80 else (YELLOW if h >= 60 else RED)
+                self._row(frame, "Sức khỏe", f"{h}%", bold=True, color=hc)
             if batt.get("design_capacity_mwh"):
                 self._row(frame, "Dung lượng TK",
                            f"{batt['design_capacity_mwh']:,} mWh")
@@ -294,141 +421,299 @@ class ScannerApp(tk.Tk):
                 self._row(frame, "Hiện tại",
                            f"{batt['full_charge_capacity_mwh']:,} mWh")
             if batt.get("cycle_count"):
-                c = batt["cycle_count"]
-                c_color = ACCENT2 if c < 300 else (WARN if c < 600 else DANGER)
-                self._row(frame, "Số lần sạc", f"{c} lần", color=c_color)
+                cc = batt["cycle_count"]
+                self._row(frame, "Số lần sạc", f"{cc} lần",
+                           color=GREEN if cc < 300 else (YELLOW if cc < 600 else RED))
         else:
             self._row(frame, "—", "Không có pin / pin đã tháo", dim=True)
 
-    def _section(self, parent, title):
-        """Header mỗi nhóm thông tin."""
-        frm = tk.Frame(parent, bg=BG, pady=4)
-        frm.pack(fill="x", padx=4, pady=(12, 2))
-        tk.Label(frm, text=title, font=FONT_HEAD,
-                 fg=ACCENT, bg=BG).pack(side="left")
-        tk.Frame(parent, bg=BORDER, height=1).pack(fill="x", padx=4)
+    def _sec(self, p, title):
+        f = tk.Frame(p, bg=BG, pady=3)
+        f.pack(fill="x", padx=4, pady=(10, 2))
+        tk.Label(f, text=title, font=FH, fg=ACCENT, bg=BG).pack(side="left")
+        tk.Frame(p, bg=BORDER, height=1).pack(fill="x", padx=4)
 
-    def _row(self, parent, label, value,
-             bold=False, mono=False, dim=False, accent=False, color=None):
-        """Một dòng key-value."""
-        row = tk.Frame(parent, bg=CARD, pady=5)
+    def _row(self, p, label, value, bold=False, mono=False,
+             dim=False, color=None):
+        row = tk.Frame(p, bg=CARD, pady=5)
         row.pack(fill="x", padx=4, pady=1)
-
-        lbl_font = FONT_BODY
-        val_font = FONT_MONO if mono else (FONT_HEAD if bold else FONT_BODY)
-        val_fg = (color if color else
-                  (ACCENT if accent else (TEXT_DIM if dim else TEXT)))
-
-        tk.Label(row, text=label, font=lbl_font, fg=TEXT_DIM, bg=CARD,
+        fg  = color or (DIM if dim else TEXT)
+        vf  = FM if mono else (FH if bold else FB)
+        tk.Label(row, text=label, font=FB, fg=DIM, bg=CARD,
                  width=14, anchor="w").pack(side="left", padx=(10, 4))
-        tk.Label(row, text=value, font=val_font, fg=val_fg, bg=CARD,
-                 anchor="w", wraplength=420, justify="left").pack(side="left", padx=(0, 8))
+        tk.Label(row, text=value, font=vf, fg=fg, bg=CARD,
+                 anchor="w", wraplength=400, justify="left").pack(
+            side="left", padx=(0, 8))
 
-    # ── Render QR ────────────────────────────────────────────────────────────
+    # ── Tab 2: Checklist ──────────────────────────────────────────────────────
 
-    def _render_qr(self, data):
+    def _build_checklist(self):
+        for w in self._tab_cl.winfo_children():
+            w.destroy()
+        self._vars = {}
+
+        canvas = tk.Canvas(self._tab_cl, bg=BG, highlightthickness=0)
+        sb = ttk.Scrollbar(self._tab_cl, orient="vertical", command=canvas.yview)
+        frame = tk.Frame(canvas, bg=BG)
+        frame.bind("<Configure>",
+                   lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=frame, anchor="nw")
+        canvas.configure(yscrollcommand=sb.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+        canvas.bind_all("<MouseWheel>",
+                        lambda e: canvas.yview_scroll(-1*(e.delta//120), "units"))
+
+        # style radio buttons
+        style = ttk.Style()
+        style.configure("CL.TRadiobutton",
+                        background=CARD2, foreground=TEXT,
+                        font=FB, focuscolor=CARD2)
+        style.map("CL.TRadiobutton",
+                  background=[("active", CARD2)],
+                  foreground=[("active", WHITE)])
+
+        for item in CHECKLIST:
+            qid = item["id"]
+            var = tk.IntVar(value=-1)
+            self._vars[qid] = var
+
+            # Card câu hỏi
+            card = tk.Frame(frame, bg=CARD2, pady=10,
+                            highlightthickness=1, highlightbackground=BORDER)
+            card.pack(fill="x", padx=6, pady=5)
+
+            # Tiêu đề câu hỏi
+            hdr = tk.Frame(card, bg=CARD2)
+            hdr.pack(fill="x", padx=12, pady=(0, 6))
+            tk.Label(hdr, text=item["icon"], font=("Segoe UI", 14),
+                     fg=ACCENT, bg=CARD2).pack(side="left")
+            tk.Label(hdr, text=f"  {item['category']}",
+                     font=FH, fg=ACCENT, bg=CARD2).pack(side="left")
+
+            tk.Label(card, text=item["question"],
+                     font=FB, fg=TEXT, bg=CARD2,
+                     anchor="w").pack(fill="x", padx=14, pady=(0, 8))
+
+            # Các lựa chọn
+            for i, opt in enumerate(item["options"]):
+                is_red = opt.get("red_flag", False)
+                score  = opt["score"]
+
+                row = tk.Frame(card, bg=CARD2)
+                row.pack(fill="x", padx=14, pady=2)
+
+                rb = ttk.Radiobutton(
+                    row, text=opt["label"],
+                    variable=var, value=i,
+                    style="CL.TRadiobutton",
+                    command=self._on_answer_change,
+                )
+                rb.pack(side="left")
+
+                # Badge điểm / red flag
+                if is_red:
+                    badge_txt = "🚩 REJECT"
+                    badge_clr = RED
+                elif score == 0:
+                    badge_txt = "0 đ"
+                    badge_clr = GREEN
+                elif score <= 2:
+                    badge_txt = f"+{score} đ"
+                    badge_clr = YELLOW
+                else:
+                    badge_txt = f"+{score} đ"
+                    badge_clr = RED
+
+                tk.Label(row, text=badge_txt, font=FS,
+                         fg=badge_clr, bg=CARD2).pack(side="left", padx=(8, 0))
+
+        # Nút reset
+        btn_frame = tk.Frame(frame, bg=BG)
+        btn_frame.pack(fill="x", padx=6, pady=(4, 10))
+        tk.Button(btn_frame, text="↺  Reset câu trả lời",
+                  font=FS, bg=BORDER, fg=DIM,
+                  activebackground=CARD2, relief="flat",
+                  padx=12, pady=4, cursor="hand2",
+                  command=self._reset_checklist).pack(side="right")
+
+    def _on_answer_change(self):
+        self._answers = {
+            qid: var.get()
+            for qid, var in self._vars.items()
+            if var.get() >= 0
+        }
+        self._refresh_right()
+
+    def _reset_checklist(self):
+        for var in self._vars.values():
+            var.set(-1)
+        self._answers = {}
+        self._refresh_right()
+
+    # ── Panel phải: Grade + QR ────────────────────────────────────────────────
+
+    def _refresh_right(self):
+        """Vẽ lại panel phải dựa trên answers hiện tại."""
         for w in self._right.winfo_children():
             w.destroy()
 
+        answered = len(self._answers)
+        total_q  = len(CHECKLIST)
+
+        if answered == 0:
+            # Chưa có câu trả lời nào
+            self._render_qr_only()
+            return
+
+        grade, score, color, desc, flags = calc_grade(self._answers)
+
+        # ── Grade badge ──
+        badge = tk.Frame(self._right, bg=CARD, pady=16)
+        badge.pack(fill="x")
+
+        g_lbl = tk.Label(badge, text=grade,
+                          font=("Segoe UI", 52, "bold"),
+                          fg=color, bg=CARD)
+        g_lbl.pack()
+
+        tk.Label(badge, text=desc, font=FH, fg=color, bg=CARD,
+                 wraplength=260, justify="center").pack(pady=(4, 0))
+
+        # Tổng điểm
+        if grade != "REJECT":
+            tk.Label(badge, text=f"Tổng điểm phạt: {score}",
+                     font=FS, fg=DIM, bg=CARD).pack(pady=(4, 0))
+
+        # Progress câu hỏi
+        prog_txt = f"{answered}/{total_q} câu đã trả lời"
+        prog_clr = GREEN if answered == total_q else YELLOW
+        tk.Label(badge, text=prog_txt, font=FS, fg=prog_clr, bg=CARD).pack()
+
+        # ── Red flags ──
+        if flags:
+            flag_frame = tk.Frame(self._right, bg=RED, pady=8)
+            flag_frame.pack(fill="x", padx=0)
+            tk.Label(flag_frame, text="🚩  LỖI NGHIÊM TRỌNG",
+                     font=FH, fg=WHITE, bg=RED).pack()
+            for f in flags:
+                tk.Label(flag_frame, text=f, font=FS,
+                          fg=WHITE, bg=RED).pack()
+
+        tk.Frame(self._right, bg=BORDER, height=1).pack(fill="x", pady=(4, 0))
+
+        # ── QR Code ──
+        self._render_qr_section(grade=grade, score=score)
+
+    def _render_qr_only(self):
+        """Chưa kiểm định — chỉ hiện QR cấu hình."""
+        if self._data is None:
+            tk.Label(self._right, text="QR", font=("Segoe UI", 48, "bold"),
+                     fg=BORDER, bg=CARD).place(relx=0.5, rely=0.5, anchor="center")
+            return
+
+        tk.Label(self._right, text="Chưa kiểm định",
+                 font=FH, fg=DIM, bg=CARD).pack(pady=(20, 4))
+        tk.Label(self._right,
+                 text="Chọn tab  ✅ KIỂM ĐỊNH\nđể trả lời câu hỏi ngoại quan",
+                 font=FS, fg=DIM, bg=CARD,
+                 justify="center").pack()
+        tk.Frame(self._right, bg=BORDER, height=1).pack(fill="x", pady=10)
+        self._render_qr_section()
+
+    def _render_qr_section(self, grade=None, score=None):
+        if self._data is None:
+            return
         try:
             import qrcode
             from PIL import Image, ImageTk
 
             payload = {
                 "v": 1,
-                "ts": data["scan_timestamp"],
-                "mfr": data["system"].get("manufacturer", ""),
-                "mdl": data["system"].get("model", ""),
-                "sn":  data["system"].get("serial_number", ""),
-                "cpu": data["cpu"].get("name", ""),
-                "cpu_cores": data["cpu"].get("physical_cores"),
-                "cpu_ghz":   data["cpu"].get("max_freq_ghz"),
-                "ram_gb":    data["ram"].get("total_gb"),
+                "ts": self._data["scan_timestamp"],
+                "mfr": self._data["system"].get("manufacturer", ""),
+                "mdl": self._data["system"].get("model", ""),
+                "sn":  self._data["system"].get("serial_number", ""),
+                "cpu": self._data["cpu"].get("name", ""),
+                "cpu_cores": self._data["cpu"].get("physical_cores"),
+                "cpu_ghz":   self._data["cpu"].get("max_freq_ghz"),
+                "ram_gb":    self._data["ram"].get("total_gb"),
                 "ram_slots": [
                     {"gb": s["capacity_gb"], "type": s["type"], "mhz": s["speed_mhz"]}
-                    for s in data["ram"].get("slots", [])
+                    for s in self._data["ram"].get("slots", [])
                 ],
                 "disks": [
                     {"name": d["name"], "gb": d["size_gb"], "iface": d["interface"]}
-                    for d in data["storage"]
+                    for d in self._data["storage"]
                 ],
-                "batt_health":      data["battery"].get("health_percent"),
-                "batt_cycles":      data["battery"].get("cycle_count"),
-                "batt_design_mwh":  data["battery"].get("design_capacity_mwh"),
-                "batt_full_mwh":    data["battery"].get("full_charge_capacity_mwh"),
+                "batt_health":     self._data["battery"].get("health_percent"),
+                "batt_cycles":     self._data["battery"].get("cycle_count"),
+                "batt_design_mwh": self._data["battery"].get("design_capacity_mwh"),
+                "batt_full_mwh":   self._data["battery"].get("full_charge_capacity_mwh"),
                 "gpus": [
-                    {"name": g.get("name", ""), "vram_gb": g.get("vram_gb"), "type": g.get("type", "")}
-                    for g in data.get("gpu", [])
+                    {"name": g.get("name",""), "vram_gb": g.get("vram_gb"),
+                     "type": g.get("type","")}
+                    for g in self._data.get("gpu", [])
                 ],
+                "grade": grade,
+                "score": score,
+                "checklist": {
+                    qid: CHECKLIST[next(
+                        i for i, c in enumerate(CHECKLIST) if c["id"] == qid
+                    )]["options"][idx]["label"]
+                    for qid, idx in self._answers.items()
+                },
             }
 
             json_str = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
-            qr = qrcode.QRCode(
-                version=None,
-                error_correction=qrcode.constants.ERROR_CORRECT_M,
-                box_size=7,
-                border=2,
-            )
+            qr = qrcode.QRCode(version=None,
+                               error_correction=qrcode.constants.ERROR_CORRECT_M,
+                               box_size=6, border=2)
             qr.add_data(json_str)
             qr.make(fit=True)
             img = qr.make_image(fill_color="black", back_color="white")
 
-            # Resize QR vừa khung phải
             self._right.update_idletasks()
-            rw = max(self._right.winfo_width() - 32, 280)
-            rh = max(self._right.winfo_height() - 120, 280)
-            size = min(rw, rh)
+            avail_h = max(self._right.winfo_height() - 260, 180)
+            avail_w = max(self._right.winfo_width() - 24, 180)
+            size = min(avail_w, avail_h)
 
             pil_img = img.get_image().resize((size, size), Image.NEAREST)
             photo = ImageTk.PhotoImage(pil_img)
-            self._qr_img = photo  # giữ reference tránh GC
+            self._qr_img = photo
 
             tk.Label(self._right, text="Quét để nhập vào App",
-                     font=FONT_HEAD, fg=TEXT, bg=CARD).pack(pady=(16, 8))
-
+                     font=FH, fg=TEXT, bg=CARD).pack(pady=(8, 4))
             tk.Label(self._right, image=photo, bg=CARD).pack()
 
-            sn = data["system"].get("serial_number", "")
-            tk.Label(self._right, text=sn, font=FONT_MONO,
-                     fg=ACCENT, bg=CARD).pack(pady=(8, 4))
+            sn = self._data["system"].get("serial_number", "")
+            tk.Label(self._right, text=sn, font=FM, fg=ACCENT, bg=CARD).pack(pady=(6, 2))
 
-            # Nút lưu QR
-            tk.Button(
-                self._right, text="💾  Lưu QR ra file",
-                font=FONT_SMALL, bg=BORDER, fg=TEXT,
-                activebackground=ACCENT, relief="flat",
-                padx=10, pady=4, cursor="hand2",
-                command=lambda: self._save_qr(img, sn)
-            ).pack(pady=(4, 12))
+            tk.Button(self._right, text="💾  Lưu QR",
+                      font=FS, bg=BORDER, fg=TEXT,
+                      activebackground=ACCENT, relief="flat",
+                      padx=10, pady=3, cursor="hand2",
+                      command=lambda: self._save_qr(img, sn)).pack(pady=(2, 10))
 
         except Exception as e:
-            tk.Label(self._right, text=f"Không thể tạo QR:\n{e}",
-                     font=FONT_SMALL, fg=DANGER, bg=CARD,
-                     wraplength=220, justify="center").place(
-                relx=0.5, rely=0.5, anchor="center")
+            tk.Label(self._right, text=f"QR lỗi:\n{e}",
+                     font=FS, fg=RED, bg=CARD,
+                     wraplength=220, justify="center").pack(pady=20)
 
     def _save_qr(self, img, sn):
-        path = os.path.join(
-            tempfile.gettempdir(),
-            f"o2o_qr_{sn or 'unknown'}_{datetime.now().strftime('%H%M%S')}.png"
-        )
+        path = os.path.join(tempfile.gettempdir(),
+                            f"o2o_qr_{sn or 'unknown'}_{datetime.now():%H%M%S}.png")
         img.save(path)
-        self._set_status(f"Đã lưu QR: {path}")
-
-        import subprocess
+        self._status.config(text=f"Đã lưu QR: {path}")
         try:
             if platform.system() == "Windows":
                 os.startfile(path)
             elif platform.system() == "Darwin":
+                import subprocess
                 subprocess.run(["open", path])
         except Exception:
             pass
-
-    # ── Helpers ──────────────────────────────────────────────────────────────
-
-    def _set_status(self, msg):
-        self._status.config(text=msg)
 
 
 def main():
