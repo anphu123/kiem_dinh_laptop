@@ -15,6 +15,7 @@ import platform
 from datetime import datetime
 
 import scanner
+import gemini_pricer
 
 # ── Màu sắc ─────────────────────────────────────────────────────────────────
 BG       = "#0F1117"
@@ -600,10 +601,113 @@ class ScannerApp(tk.Tk):
                 tk.Label(flag_frame, text=f, font=FS,
                           fg=WHITE, bg=RED).pack()
 
+        # ── Nút Định giá AI ──
+        ai_btn = tk.Button(
+            self._right, text="🤖  Định giá bằng AI",
+            font=FH, bg="#7C3AED", fg=WHITE,
+            activebackground="#6D28D9", relief="flat",
+            padx=16, pady=8, cursor="hand2",
+            command=lambda g=grade, sc=score: self._run_ai_pricing(g, sc)
+        )
+        ai_btn.pack(fill="x", padx=16, pady=(8, 4))
+
         tk.Frame(self._right, bg=BORDER, height=1).pack(fill="x", pady=(4, 0))
 
         # ── QR Code ──
         self._render_qr_section(grade=grade, score=score)
+
+    def _run_ai_pricing(self, grade, score):
+        """Gọi Gemini API trong background thread, hiện popup kết quả."""
+        win = tk.Toplevel(self)
+        win.title("🤖 Định giá AI")
+        win.configure(bg=BG)
+        win.geometry("620x500")
+        win.resizable(True, True)
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        win.geometry(f"620x500+{(sw-620)//2}+{(sh-500)//2}")
+
+        # Header
+        hdr = tk.Frame(win, bg="#7C3AED", pady=12)
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="🤖  Gemini AI — Phân tích & Định giá",
+                 font=FH, fg=WHITE, bg="#7C3AED").pack()
+
+        # Body scroll
+        canvas = tk.Canvas(win, bg=BG, highlightthickness=0)
+        sb = ttk.Scrollbar(win, orient="vertical", command=canvas.yview)
+        self._ai_frame = tk.Frame(canvas, bg=BG)
+        self._ai_frame.bind("<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=self._ai_frame, anchor="nw")
+        canvas.configure(yscrollcommand=sb.set)
+        canvas.pack(side="left", fill="both", expand=True, padx=0, pady=0)
+        sb.pack(side="right", fill="y")
+        canvas.bind_all("<MouseWheel>",
+            lambda e: canvas.yview_scroll(-1*(e.delta//120), "units"))
+
+        # Loading state
+        self._ai_status = tk.Label(
+            self._ai_frame, text="⏳  Đang kết nối Gemini AI...",
+            font=FH, fg=YELLOW, bg=BG, pady=30)
+        self._ai_status.pack()
+        self._ai_win = win
+
+        def worker():
+            try:
+                result = gemini_pricer.get_price_estimate(
+                    self._data, self._answers, CHECKLIST, grade, score)
+                self.after(0, lambda: self._show_ai_result(result, error=False))
+            except Exception as e:
+                self.after(0, lambda err=e: self._show_ai_result(str(err), error=True))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _show_ai_result(self, text, error=False):
+        for w in self._ai_frame.winfo_children():
+            w.destroy()
+
+        if error:
+            tk.Label(self._ai_frame, text="❌  Lỗi kết nối AI",
+                     font=FH, fg=RED, bg=BG, pady=12).pack()
+            tk.Label(self._ai_frame, text=text, font=FS, fg=YELLOW, bg=BG,
+                     wraplength=560, justify="left",
+                     padx=20).pack(anchor="w")
+            return
+
+        # Render từng dòng kết quả
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                tk.Frame(self._ai_frame, bg=BG, height=6).pack()
+                continue
+
+            # Dòng tiêu đề (bắt đầu bằng số. hoặc **)
+            if (stripped[:2].rstrip(".").isdigit() or
+                    stripped.startswith("**") or
+                    stripped.startswith("##")):
+                clean = stripped.lstrip("#").replace("**", "").strip()
+                fg = ACCENT
+                font = FH
+            else:
+                clean = stripped.lstrip("-•").strip()
+                fg = TEXT
+                font = FB
+
+            tk.Label(self._ai_frame, text=clean, font=font, fg=fg,
+                     bg=BG, anchor="w", wraplength=560,
+                     justify="left", padx=20, pady=1).pack(fill="x")
+
+        # Nút copy
+        def copy_text():
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            self._status.config(text="Đã copy kết quả AI vào clipboard")
+
+        tk.Button(self._ai_frame, text="📋  Copy kết quả",
+                  font=FS, bg=BORDER, fg=TEXT,
+                  activebackground=CARD2, relief="flat",
+                  padx=12, pady=5, cursor="hand2",
+                  command=copy_text).pack(pady=(12, 16))
 
     def _render_qr_only(self):
         """Chưa kiểm định — chỉ hiện QR cấu hình."""
