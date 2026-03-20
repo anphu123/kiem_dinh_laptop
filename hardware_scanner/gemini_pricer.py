@@ -4,15 +4,28 @@ Gọi Gemini API để phân tích cấu hình + kết quả kiểm định → 
 """
 
 import json
+import ssl
 import urllib.request
 import urllib.error
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 
-ENDPOINT = (
-    f"https://generativelanguage.googleapis.com/v1beta/models/"
-    f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-)
+
+def _make_endpoint():
+    return (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    )
+
+
+def _ssl_context():
+    """SSL context dùng certifi CA bundle (fix lỗi certificate trên macOS/PyInstaller)."""
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = ssl.create_default_context()
+    return ctx
 
 
 def _build_prompt(hw: dict, answers: dict, checklist: list, grade: str, score: int) -> str:
@@ -107,14 +120,14 @@ def get_price_estimate(hw: dict, answers: dict, checklist: list,
     }, ensure_ascii=False).encode("utf-8")
 
     req = urllib.request.Request(
-        ENDPOINT,
+        _make_endpoint(),
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST"
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30, context=_ssl_context()) as resp:
             result = json.loads(resp.read().decode("utf-8"))
             candidates = result.get("candidates", [])
             if not candidates:

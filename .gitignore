@@ -19,3 +19,7 @@ Thumbs.db
 
 # Temp files
 *.log
+
+# Cấu hình bí mật — KHÔNG commit
+hardware_scanner/.env
+.env

@@ -39,6 +39,9 @@ a = Analysis(
         # psutil
         'psutil',
         'psutil._pswindows',
+        # SSL / certifi
+        'certifi',
+        'ssl',
         # tkinter (đảm bảo bundled)
         'tkinter',
         'tkinter.ttk',

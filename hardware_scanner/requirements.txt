@@ -1,5 +1,6 @@
 psutil>=5.9.0
 qrcode[pil]>=7.4.2
-# Windows only (cài thêm nếu cần đọc sâu hơn):
+certifi>=2024.0.0
+# Windows only:
 # wmi>=1.5.1; sys_platform == "win32"
 # pywin32>=306; sys_platform == "win32"

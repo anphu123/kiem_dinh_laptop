@@ -12,7 +12,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [1/3] Cai dat thu vien...
-pip install pyinstaller psutil "qrcode[pil]" wmi pywin32 -q --upgrade
+pip install pyinstaller psutil "qrcode[pil]" wmi pywin32 certifi -q --upgrade
 if %errorlevel% neq 0 (
     echo [LOI] Cai dat thu vien that bai.
     pause & exit /b 1

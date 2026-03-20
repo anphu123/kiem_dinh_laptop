@@ -37,6 +37,9 @@ a = Analysis(
         'tkinter.messagebox',
         # plistlib (dùng để đọc diskutil)
         'plistlib',
+        # SSL / certifi
+        'certifi',
+        'ssl',
     ],
     hookspath=[],
     hooksconfig={},
