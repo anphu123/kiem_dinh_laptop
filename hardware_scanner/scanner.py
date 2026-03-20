@@ -435,6 +435,143 @@ def _parse_mac_battery():
     return result
 
 
+def get_gpu_info():
+    """Thu thập thông tin card đồ họa (GPU)."""
+    gpus = []
+
+    if platform.system() == "Windows":
+        try:
+            import wmi
+            c = wmi.WMI()
+            for gpu in c.Win32_VideoController():
+                vram_mb = None
+                if gpu.AdapterRAM:
+                    vram_mb = round(int(gpu.AdapterRAM) / (1024 ** 2))
+                gpus.append({
+                    "name": gpu.Caption.strip(),
+                    "vram_mb": vram_mb,
+                    "vram_gb": round(vram_mb / 1024, 1) if vram_mb else None,
+                    "driver_version": (gpu.DriverVersion or "").strip(),
+                    "resolution": (
+                        f"{gpu.CurrentHorizontalResolution}x{gpu.CurrentVerticalResolution}"
+                        if gpu.CurrentHorizontalResolution else None
+                    ),
+                    "type": _gpu_type(gpu.Caption or ""),
+                })
+        except ImportError:
+            try:
+                out = subprocess.check_output(
+                    ["wmic", "path", "win32_VideoController",
+                     "get", "Caption,AdapterRAM,DriverVersion,CurrentHorizontalResolution,CurrentVerticalResolution",
+                     "/format:csv"],
+                    text=True, stderr=subprocess.DEVNULL
+                )
+                for line in out.strip().splitlines():
+                    if not line.strip() or "Caption" in line:
+                        continue
+                    parts = line.split(",")
+                    if len(parts) >= 6:
+                        try:
+                            vram_mb = round(int(parts[2].strip()) / (1024 ** 2)) if parts[2].strip().isdigit() else None
+                            gpus.append({
+                                "name": parts[1].strip(),
+                                "vram_mb": vram_mb,
+                                "vram_gb": round(vram_mb / 1024, 1) if vram_mb else None,
+                                "driver_version": parts[3].strip(),
+                                "resolution": f"{parts[4].strip()}x{parts[5].strip()}" if parts[4].strip() else None,
+                                "type": _gpu_type(parts[1]),
+                            })
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+    elif platform.system() == "Darwin":
+        gpus = _get_mac_gpu()
+
+    return gpus
+
+
+def _gpu_type(name):
+    """Phân loại GPU: Integrated / Dedicated."""
+    name_lower = name.lower()
+    integrated_keywords = ["intel", "uhd", "iris", "hd graphics", "apple m", "amd radeon(tm)"]
+    dedicated_keywords  = ["nvidia", "geforce", "rtx", "gtx", "quadro",
+                           "radeon rx", "radeon pro", "arc"]
+    for k in dedicated_keywords:
+        if k in name_lower:
+            return "Dedicated"
+    for k in integrated_keywords:
+        if k in name_lower:
+            return "Integrated"
+    return "Unknown"
+
+
+def _get_mac_gpu():
+    """Lấy thông tin GPU trên macOS qua system_profiler."""
+    gpus = []
+    try:
+        out = subprocess.check_output(
+            ["system_profiler", "SPDisplaysDataType"],
+            text=True, stderr=subprocess.DEVNULL
+        )
+
+        # Mỗi GPU bắt đầu bằng tên chip (dòng đầu trong block)
+        # system_profiler trả về dạng text có indent
+        current = {}
+        for line in out.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            # Dòng tên GPU (không có dấu ':' ở cuối)
+            if not stripped.endswith(":") and ":" not in stripped and len(stripped) > 3:
+                if current:
+                    gpus.append(current)
+                current = {"name": stripped, "type": _gpu_type(stripped)}
+                continue
+
+            if ":" in stripped:
+                key, _, val = stripped.partition(":")
+                key = key.strip().lower()
+                val = val.strip()
+
+                if "vram" in key or "memory" in key:
+                    # "VRAM (Total): 16 GB" hoặc "Chipset Model: Apple M1"
+                    num = re.search(r"(\d+)\s*(gb|mb)", val, re.IGNORECASE)
+                    if num:
+                        amount = int(num.group(1))
+                        unit   = num.group(2).upper()
+                        current["vram_gb"] = amount if unit == "GB" else round(amount / 1024, 1)
+                        current["vram_mb"] = amount * 1024 if unit == "GB" else amount
+
+                elif "chipset model" in key:
+                    current["name"] = val
+                    current["type"] = _gpu_type(val)
+
+                elif "metal" in key:
+                    current["metal"] = val
+
+                elif "resolution" in key and "resolution" not in current:
+                    current["resolution"] = val
+
+        if current:
+            gpus.append(current)
+
+        # Deduplicate nếu GPU xuất hiện nhiều lần (tích hợp + built-in display)
+        seen = set()
+        unique = []
+        for g in gpus:
+            if g.get("name") and g["name"] not in seen:
+                seen.add(g["name"])
+                unique.append(g)
+        gpus = unique
+
+    except Exception:
+        pass
+    return gpus
+
+
 def get_display_info():
     """Thu thập thông tin màn hình (Windows)."""
     displays = []
@@ -466,6 +603,7 @@ def collect_all():
         "ram": get_ram_info(),
         "storage": get_storage_info(),
         "battery": get_battery_info(),
+        "gpu": get_gpu_info(),
         "display": get_display_info(),
     }
 

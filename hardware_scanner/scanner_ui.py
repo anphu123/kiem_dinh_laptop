@@ -165,9 +165,10 @@ class ScannerApp(tk.Tk):
             ("RAM...",               scanner.get_ram_info),
             ("Ổ cứng...",            scanner.get_storage_info),
             ("Pin...",               scanner.get_battery_info),
+            ("Card đồ họa...",       scanner.get_gpu_info),
             ("Màn hình...",          scanner.get_display_info),
         ]
-        keys   = ["system", "cpu", "ram", "storage", "battery", "display"]
+        keys   = ["system", "cpu", "ram", "storage", "battery", "gpu", "display"]
         result = {"scan_timestamp": datetime.now().isoformat()}
 
         for (msg, fn), key in zip(steps, keys):
@@ -256,6 +257,28 @@ class ScannerApp(tk.Tk):
         else:
             self._row(frame, "—", "Không phát hiện ổ cứng", dim=True)
 
+        # ── Card đồ họa ──
+        gpus = data.get("gpu", [])
+        self._section(frame, "🎮  CARD ĐỒ HỌA")
+        if gpus:
+            for gpu in gpus:
+                name = gpu.get("name", "Unknown")
+                parts = []
+                if gpu.get("vram_gb"):
+                    parts.append(f"{gpu['vram_gb']} GB VRAM")
+                elif gpu.get("vram_mb"):
+                    parts.append(f"{gpu['vram_mb']} MB VRAM")
+                gpu_type = gpu.get("type", "")
+                if gpu_type:
+                    parts.append(gpu_type)
+                if gpu.get("resolution"):
+                    parts.append(gpu["resolution"])
+                val = "  •  ".join(parts) if parts else "—"
+                type_color = ACCENT if gpu_type == "Dedicated" else (ACCENT2 if gpu_type == "Integrated" else TEXT)
+                self._row(frame, name, val, color=type_color if gpu_type == "Dedicated" else None)
+        else:
+            self._row(frame, "—", "Không phát hiện GPU", dim=True)
+
         # ── Pin ──
         self._section(frame, "🔋  PIN")
         if batt.get("present"):
@@ -333,6 +356,10 @@ class ScannerApp(tk.Tk):
                 "batt_cycles":      data["battery"].get("cycle_count"),
                 "batt_design_mwh":  data["battery"].get("design_capacity_mwh"),
                 "batt_full_mwh":    data["battery"].get("full_charge_capacity_mwh"),
+                "gpus": [
+                    {"name": g.get("name", ""), "vram_gb": g.get("vram_gb"), "type": g.get("type", "")}
+                    for g in data.get("gpu", [])
+                ],
             }
 
             json_str = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
