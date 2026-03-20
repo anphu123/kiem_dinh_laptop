@@ -1,0 +1,66 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags:
+      - 'v*'          # trigger khi push tag vd: v1.0.0
+  workflow_dispatch:  # cho phép chạy tay từ GitHub UI
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: hardware_scanner
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller psutil "qrcode[pil]" wmi pywin32
+
+      - name: Build EXE
+        working-directory: hardware_scanner
+        run: |
+          pyinstaller O2O_Inspection.spec
+
+      - name: Verify EXE exists
+        working-directory: hardware_scanner
+        run: |
+          dir dist\
+          echo "Build OK: O2O_Inspection.exe"
+
+      - name: Upload EXE as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: O2O_Inspection_Windows
+          path: hardware_scanner/dist/O2O_Inspection.exe
+          retention-days: 30
+
+      # Tạo GitHub Release tự động khi push tag
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "O2O Inspection ${{ github.ref_name }}"
+          body: |
+            ## O2O Laptop Inspection ${{ github.ref_name }}
+
+            ### Cách dùng
+            1. Download file `O2O_Inspection.exe`
+            2. Copy vào USB
+            3. Cắm USB vào laptop cần test
+            4. Double-click chạy — không cần cài Python
+
+            ### Yêu cầu
+            - Windows 10 / 11
+            - Chạy với quyền Administrator để đọc được thông tin BIOS/pin
+          files: hardware_scanner/dist/O2O_Inspection.exe
+          draft: false
+          prerelease: false
