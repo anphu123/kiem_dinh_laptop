@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "grading": [
+    {"min": 0,  "max": 2,  "grade": "A", "color": "#00D4AA", "desc": "Máy tốt — Thu mua / bán ra giá cao"},
+    {"min": 3,  "max": 5,  "grade": "B", "color": "#4F8EF7", "desc": "Máy khá — Giá trung bình"},
+    {"min": 6,  "max": 9,  "grade": "C", "color": "#F5A623", "desc": "Máy trung bình — Giảm giá"},
+    {"min": 10, "max": 999,"grade": "D", "color": "#E74C3C", "desc": "Máy yếu — Giảm sâu / linh kiện"}
+  ],
+  "checklist": [
+    {
+      "id": "power", "icon": "⚡", "category": "NGUỒN & KHỞI ĐỘNG",
+      "question": "Máy có khởi động được không?",
+      "options": [
+        {"label": "Khởi động bình thường",          "score": 0},
+        {"label": "Khởi động chậm / lỗi phần mềm", "score": 2},
+        {"label": "Chết nguồn hoàn toàn",           "score": 0, "red_flag": true}
+      ]
+    },
+    {
+      "id": "bios", "icon": "🔒", "category": "BIOS / BITLOCKER",
+      "question": "Tình trạng khóa BIOS / BitLocker?",
+      "options": [
+        {"label": "Không khóa",                       "score": 0},
+        {"label": "Khóa BitLocker (có thể mở được)", "score": 0, "red_flag": true},
+        {"label": "Khóa BIOS (không tháo được)",     "score": 0, "red_flag": true}
+      ]
+    },
+    {
+      "id": "screen", "icon": "🖥", "category": "MÀN HÌNH",
+      "question": "Tình trạng màn hình?",
+      "options": [
+        {"label": "Hoàn hảo, không tì vết",              "score": 0},
+        {"label": "Trầy nhẹ, không ảnh hưởng hiển thị", "score": 1},
+        {"label": "Trầy nhiều / điểm chết pixel",        "score": 4},
+        {"label": "Chảy mực / nứt vỡ",                   "score": 0, "red_flag": true}
+      ]
+    },
+    {
+      "id": "chassis", "icon": "📦", "category": "VỎ MÁY",
+      "question": "Tình trạng vỏ máy (nắp, đáy, viền)?",
+      "options": [
+        {"label": "Nguyên vẹn",           "score": 0},
+        {"label": "Trầy nhẹ",             "score": 1},
+        {"label": "Móp / nứt nhẹ",        "score": 3},
+        {"label": "Vỡ / biến dạng nặng", "score": 7}
+      ]
+    },
+    {
+      "id": "keyboard", "icon": "⌨", "category": "BÀN PHÍM",
+      "question": "Tình trạng bàn phím?",
+      "options": [
+        {"label": "Đầy đủ, hoạt động tốt",           "score": 0},
+        {"label": "Mòn phím / bẩn nhẹ",              "score": 1},
+        {"label": "Mất hoặc liệt 1-2 phím",          "score": 3},
+        {"label": "Liệt nhiều phím / không dùng được","score": 7}
+      ]
+    },
+    {
+      "id": "hinge", "icon": "🔩", "category": "BẢN LỀ",
+      "question": "Tình trạng bản lề màn hình?",
+      "options": [
+        {"label": "Chắc chắn, mở đóng mượt","score": 0},
+        {"label": "Hơi lỏng",               "score": 1},
+        {"label": "Lỏng nhiều / kêu",       "score": 3},
+        {"label": "Gãy / vỡ bản lề",        "score": 7}
+      ]
+    },
+    {
+      "id": "touchpad", "icon": "🖱", "category": "TOUCHPAD",
+      "question": "Tình trạng touchpad?",
+      "options": [
+        {"label": "Nhạy, hoạt động tốt", "score": 0},
+        {"label": "Giật / kém nhạy nhẹ", "score": 2},
+        {"label": "Không hoạt động",     "score": 4}
+      ]
+    },
+    {
+      "id": "ports", "icon": "🔌", "category": "CỔNG KẾT NỐI",
+      "question": "Tình trạng cổng USB / HDMI / jack?",
+      "options": [
+        {"label": "Tất cả hoạt động", "score": 0},
+        {"label": "Hỏng 1 cổng phụ", "score": 1},
+        {"label": "Hỏng 2+ cổng",    "score": 3}
+      ]
+    },
+    {
+      "id": "camera", "icon": "📷", "category": "CAMERA & MIC",
+      "question": "Tình trạng camera tích hợp?",
+      "options": [
+        {"label": "Hoạt động tốt",  "score": 0},
+        {"label": "Chất lượng kém", "score": 1},
+        {"label": "Không hoạt động","score": 2}
+      ]
+    },
+    {
+      "id": "speaker", "icon": "🔊", "category": "LOA & ÂM THANH",
+      "question": "Tình trạng loa?",
+      "options": [
+        {"label": "Âm thanh to, rõ",   "score": 0},
+        {"label": "Rè / méo tiếng nhẹ","score": 1},
+        {"label": "Không có âm thanh", "score": 2}
+      ]
+    }
+  ]
+}

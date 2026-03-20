@@ -14,6 +14,7 @@ import tempfile
 import platform
 from datetime import datetime
 
+import sys
 import scanner
 import gemini_pricer
 
@@ -39,7 +40,29 @@ FS = ("Segoe UI", 9)
 FBG = ("Segoe UI", 42, "bold")
 
 # ── Bộ câu hỏi kiểm định ─────────────────────────────────────────────────────
-CHECKLIST = [
+def _load_config():
+    """Load checklist + grading từ checklist.json cạnh exe, fallback về default."""
+    candidates = [
+        os.path.join(os.path.dirname(os.path.abspath(
+            sys.executable if getattr(sys, "frozen", False) else __file__
+        )), "checklist.json"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "checklist.json"),
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+                return data.get("checklist", []), data.get("grading", [])
+            except Exception:
+                pass
+    return None, None  # fallback về hardcode bên dưới
+
+
+_cl_from_file, _gr_from_file = _load_config()
+
+# ── Hardcode default (dùng khi không có file JSON) ───────────────────────────
+_CHECKLIST_DEFAULT = [
     {
         "id": "power", "icon": "⚡", "category": "NGUỒN & KHỞI ĐỘNG",
         "question": "Máy có khởi động được không?",
@@ -136,12 +159,20 @@ CHECKLIST = [
     },
 ]
 
-GRADE_TABLE = [
-    (0,  2,  "A",      GREEN,  "Máy tốt — Thu mua / bán ra giá cao"),
-    (3,  5,  "B",      ACCENT, "Máy khá — Giá trung bình"),
-    (6,  9,  "C",      YELLOW, "Máy trung bình — Giảm giá"),
-    (10, 99, "D",      RED,    "Máy yếu — Giảm sâu / linh kiện"),
+_GRADE_DEFAULT = [
+    (0,  2,  "A", GREEN,  "Máy tốt — Thu mua / bán ra giá cao"),
+    (3,  5,  "B", ACCENT, "Máy khá — Giá trung bình"),
+    (6,  9,  "C", YELLOW, "Máy trung bình — Giảm giá"),
+    (10, 999,"D", RED,    "Máy yếu — Giảm sâu / linh kiện"),
 ]
+
+# ── Active config: ưu tiên JSON file, fallback hardcode ──────────────────────
+CHECKLIST = _cl_from_file if _cl_from_file else _CHECKLIST_DEFAULT
+
+GRADE_TABLE = (
+    [(g["min"], g["max"], g["grade"], g["color"], g["desc"]) for g in _gr_from_file]
+    if _gr_from_file else _GRADE_DEFAULT
+)
 
 
 def calc_grade(answers: dict):
