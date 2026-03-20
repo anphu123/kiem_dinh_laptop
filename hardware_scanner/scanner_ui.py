@@ -215,10 +215,12 @@ class ScannerApp(tk.Tk):
         self.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
         self.minsize(960, 640)
 
-        self._data     = None
-        self._qr_img   = None
-        self._answers  = {}          # {qid: option_idx}
-        self._vars     = {}          # {qid: IntVar}
+        self._data       = None
+        self._qr_img     = None
+        self._answers    = {}   # {qid: option_idx}
+        self._vars       = {}   # {qid: IntVar}
+        self._ai_cache   = {}   # {cache_key: result_text}
+        self._ai_running = False
 
         self._build_header()
         self._build_body()
@@ -576,11 +578,15 @@ class ScannerApp(tk.Tk):
             if var.get() >= 0
         }
         self._refresh_right()
+        # Auto-gọi AI khi trả lời hết
+        if len(self._answers) == len(CHECKLIST):
+            self._auto_ai()
 
     def _reset_checklist(self):
         for var in self._vars.values():
             var.set(-1)
         self._answers = {}
+        self._ai_cache = {}
         self._refresh_right()
 
     # ── Panel phải: Grade + QR ────────────────────────────────────────────────
@@ -632,113 +638,127 @@ class ScannerApp(tk.Tk):
                 tk.Label(flag_frame, text=f, font=FS,
                           fg=WHITE, bg=RED).pack()
 
-        # ── Nút Định giá AI ──
-        ai_btn = tk.Button(
-            self._right, text="🤖  Định giá bằng AI",
-            font=FH, bg="#7C3AED", fg=WHITE,
-            activebackground="#6D28D9", relief="flat",
-            padx=16, pady=8, cursor="hand2",
-            command=lambda g=grade, sc=score: self._run_ai_pricing(g, sc)
-        )
-        ai_btn.pack(fill="x", padx=16, pady=(8, 4))
+        tk.Frame(self._right, bg=BORDER, height=1).pack(fill="x", pady=(6, 0))
+
+        # ── AI Result (inline) ──
+        self._ai_result_frame = tk.Frame(self._right, bg=CARD)
+        self._ai_result_frame.pack(fill="x")
+        self._render_ai_inline(grade, score)
 
         tk.Frame(self._right, bg=BORDER, height=1).pack(fill="x", pady=(4, 0))
 
         # ── QR Code ──
         self._render_qr_section(grade=grade, score=score)
 
-    def _run_ai_pricing(self, grade, score):
-        """Gọi Gemini API trong background thread, hiện popup kết quả."""
-        win = tk.Toplevel(self)
-        win.title("🤖 Định giá AI")
-        win.configure(bg=BG)
-        win.geometry("620x500")
-        win.resizable(True, True)
-        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        win.geometry(f"620x500+{(sw-620)//2}+{(sh-500)//2}")
+    def _auto_ai(self):
+        """Tự động gọi Gemini khi trả lời hết checklist. Dùng cache nếu cùng đáp án."""
+        if self._data is None or self._ai_running:
+            return
 
-        # Header
-        hdr = tk.Frame(win, bg="#7C3AED", pady=12)
-        hdr.pack(fill="x")
-        tk.Label(hdr, text="🤖  Gemini AI — Phân tích & Định giá",
-                 font=FH, fg=WHITE, bg="#7C3AED").pack()
+        grade, score, *_ = calc_grade(self._answers)
+        cache_key = (str(sorted(self._answers.items())), grade, score)
 
-        # Body scroll
-        canvas = tk.Canvas(win, bg=BG, highlightthickness=0)
-        sb = ttk.Scrollbar(win, orient="vertical", command=canvas.yview)
-        self._ai_frame = tk.Frame(canvas, bg=BG)
-        self._ai_frame.bind("<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=self._ai_frame, anchor="nw")
-        canvas.configure(yscrollcommand=sb.set)
-        canvas.pack(side="left", fill="both", expand=True, padx=0, pady=0)
-        sb.pack(side="right", fill="y")
-        canvas.bind_all("<MouseWheel>",
-            lambda e: canvas.yview_scroll(-1*(e.delta//120), "units"))
+        if cache_key in self._ai_cache:
+            # Đã có kết quả rồi — chỉ cần refresh UI
+            self._refresh_right()
+            return
 
-        # Loading state
-        self._ai_status = tk.Label(
-            self._ai_frame, text="⏳  Đang kết nối Gemini AI...",
-            font=FH, fg=YELLOW, bg=BG, pady=30)
-        self._ai_status.pack()
-        self._ai_win = win
+        self._ai_running = True
+        self._status.config(text="🤖 Gemini đang phân tích...")
 
         def worker():
             try:
                 result = gemini_pricer.get_price_estimate(
                     self._data, self._answers, CHECKLIST, grade, score)
-                self.after(0, lambda: self._show_ai_result(result, error=False))
+                self._ai_cache[cache_key] = result
             except Exception as e:
-                self.after(0, lambda err=e: self._show_ai_result(str(err), error=True))
+                self._ai_cache[cache_key] = f"__ERROR__{e}"
+            finally:
+                self._ai_running = False
+                self.after(0, self._refresh_right)
+                self.after(0, lambda: self._status.config(
+                    text=f"Hoàn tất  •  Serial: {self._data['system'].get('serial_number','')}"
+                ))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _show_ai_result(self, text, error=False):
-        for w in self._ai_frame.winfo_children():
+    def _render_ai_inline(self, grade, score):
+        """Hiện kết quả AI inline trong panel phải (không popup)."""
+        f = self._ai_result_frame
+        for w in f.winfo_children():
             w.destroy()
 
-        if error:
-            tk.Label(self._ai_frame, text="❌  Lỗi kết nối AI",
-                     font=FH, fg=RED, bg=BG, pady=12).pack()
-            tk.Label(self._ai_frame, text=text, font=FS, fg=YELLOW, bg=BG,
-                     wraplength=560, justify="left",
-                     padx=20).pack(anchor="w")
+        answered = len(self._answers)
+        total_q  = len(CHECKLIST)
+
+        # Chưa đủ câu hỏi
+        if answered < total_q:
+            remaining = total_q - answered
+            tk.Label(f, text=f"🤖  Còn {remaining} câu nữa → AI tự định giá",
+                     font=FS, fg=DIM, bg=CARD, pady=8).pack()
             return
 
-        # Render từng dòng kết quả
-        for line in text.splitlines():
+        # Đang chờ AI
+        cache_key = (str(sorted(self._answers.items())), grade, score)
+        if cache_key not in self._ai_cache:
+            tk.Label(f, text="🤖  Đang phân tích...", font=FH,
+                     fg="#7C3AED", bg=CARD, pady=10).pack()
+            return
+
+        result = self._ai_cache[cache_key]
+
+        # Header AI
+        ai_hdr = tk.Frame(f, bg="#2D1B69", pady=6)
+        ai_hdr.pack(fill="x")
+        tk.Label(ai_hdr, text="🤖  Gemini AI — Phân tích & Định giá",
+                 font=FH, fg=WHITE, bg="#2D1B69").pack()
+
+        if result.startswith("__ERROR__"):
+            err = result[9:]
+            tk.Label(f, text=f"❌ {err}", font=FS, fg=RED, bg=CARD,
+                     wraplength=260, justify="left", padx=8, pady=6).pack(fill="x")
+
+            tk.Button(f, text="↺  Thử lại", font=FS,
+                      bg=BORDER, fg=TEXT, relief="flat",
+                      padx=10, pady=3, cursor="hand2",
+                      command=lambda k=cache_key: self._retry_ai(k)
+                      ).pack(pady=4)
+            return
+
+        # Render kết quả từng dòng
+        txt_frame = tk.Frame(f, bg=CARD)
+        txt_frame.pack(fill="x", padx=4, pady=4)
+
+        for line in result.splitlines():
             stripped = line.strip()
             if not stripped:
-                tk.Frame(self._ai_frame, bg=BG, height=6).pack()
+                tk.Frame(txt_frame, bg=CARD, height=4).pack()
                 continue
+            is_head = (stripped[:2].rstrip(".").isdigit() or
+                       stripped.startswith("**") or stripped.startswith("##"))
+            clean = stripped.lstrip("#").replace("**", "").lstrip("-•").strip()
+            tk.Label(txt_frame, text=clean,
+                     font=FH if is_head else FS,
+                     fg=ACCENT if is_head else TEXT,
+                     bg=CARD, anchor="w",
+                     wraplength=250, justify="left",
+                     padx=8, pady=0).pack(fill="x")
 
-            # Dòng tiêu đề (bắt đầu bằng số. hoặc **)
-            if (stripped[:2].rstrip(".").isdigit() or
-                    stripped.startswith("**") or
-                    stripped.startswith("##")):
-                clean = stripped.lstrip("#").replace("**", "").strip()
-                fg = ACCENT
-                font = FH
-            else:
-                clean = stripped.lstrip("-•").strip()
-                fg = TEXT
-                font = FB
-
-            tk.Label(self._ai_frame, text=clean, font=font, fg=fg,
-                     bg=BG, anchor="w", wraplength=560,
-                     justify="left", padx=20, pady=1).pack(fill="x")
-
-        # Nút copy
+        # Copy button
         def copy_text():
             self.clipboard_clear()
-            self.clipboard_append(text)
-            self._status.config(text="Đã copy kết quả AI vào clipboard")
+            self.clipboard_append(result)
+            self._status.config(text="Đã copy kết quả AI")
 
-        tk.Button(self._ai_frame, text="📋  Copy kết quả",
-                  font=FS, bg=BORDER, fg=TEXT,
-                  activebackground=CARD2, relief="flat",
-                  padx=12, pady=5, cursor="hand2",
-                  command=copy_text).pack(pady=(12, 16))
+        tk.Button(f, text="📋  Copy", font=FS,
+                  bg=BORDER, fg=DIM, relief="flat",
+                  padx=8, pady=2, cursor="hand2",
+                  command=copy_text).pack(pady=(4, 6))
+
+    def _retry_ai(self, old_key):
+        """Xoá cache lỗi, gọi lại AI."""
+        self._ai_cache.pop(old_key, None)
+        self._auto_ai()
 
     def _render_qr_only(self):
         """Chưa kiểm định — chỉ hiện QR cấu hình."""
