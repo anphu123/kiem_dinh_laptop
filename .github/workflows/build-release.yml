@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows & macOS
 
 on:
   push:
@@ -7,21 +7,21 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # cần để tạo Release
+  contents: write
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # dùng Node.js 24
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build:
+
+  # ── Build Windows EXE ─────────────────────────────────────────────────────
+  build-windows:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -33,39 +33,90 @@ jobs:
 
       - name: Build EXE
         working-directory: hardware_scanner
-        run: |
-          pyinstaller O2O_Inspection.spec
+        run: pyinstaller O2O_Inspection.spec --clean --noconfirm
 
-      - name: Verify EXE exists
-        working-directory: hardware_scanner
-        run: |
-          dir dist\
-          echo "Build OK: O2O_Inspection.exe"
-
-      - name: Upload EXE as artifact
+      - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: O2O_Inspection_Windows
           path: hardware_scanner/dist/O2O_Inspection.exe
           retention-days: 30
 
+  # ── Build macOS .app ──────────────────────────────────────────────────────
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install tkinter
+        run: brew install python-tk@3.11
+
+      - name: Install dependencies
+        working-directory: hardware_scanner
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller psutil "qrcode[pil]"
+
+      - name: Build .app
+        working-directory: hardware_scanner
+        run: pyinstaller O2O_Inspection_mac.spec --clean --noconfirm
+
+      - name: Zip .app bundle
+        working-directory: hardware_scanner/dist
+        run: zip -r O2O_Inspection_mac.zip O2O_Inspection.app
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: O2O_Inspection_macOS
+          path: hardware_scanner/dist/O2O_Inspection_mac.zip
+          retention-days: 30
+
+  # ── Tạo GitHub Release (chỉ khi push tag) ────────────────────────────────
+  release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: O2O_Inspection_Windows
+          path: release/
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: O2O_Inspection_macOS
+          path: release/
+
       - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: "O2O Inspection ${{ github.ref_name }}"
           body: |
             ## O2O Laptop Inspection ${{ github.ref_name }}
 
-            ### Cách dùng
-            1. Download file `O2O_Inspection.exe`
-            2. Copy vào USB
-            3. Cắm USB vào laptop cần test
-            4. Double-click chạy — không cần cài Python
+            | File | Hệ điều hành |
+            |------|-------------|
+            | `O2O_Inspection.exe` | Windows 10 / 11 |
+            | `O2O_Inspection_mac.zip` | macOS 12+ (Intel & Apple Silicon) |
 
-            ### Yêu cầu
-            - Windows 10 / 11
-            - Chạy với quyền Administrator để đọc được thông tin BIOS/pin
-          files: hardware_scanner/dist/O2O_Inspection.exe
+            ### Cách dùng
+            **Windows:** Double-click `O2O_Inspection.exe` — không cần cài Python
+
+            **macOS:** Giải nén zip → kéo `O2O_Inspection.app` vào Applications → mở lần đầu: chuột phải → Open
+
+            ### Lưu ý
+            - Chạy với quyền Admin/sudo để đọc đầy đủ thông tin BIOS và pin
+          files: |
+            release/O2O_Inspection.exe
+            release/O2O_Inspection_mac.zip
           draft: false
           prerelease: false
