@@ -73,8 +73,8 @@ def _build_prompt(hw: dict, answers: dict, checklist: list, grade: str, score: i
             cl_lines.append(f"  - {item['category']}: {opt['label']}{flag}")
     cl_summary = "\n".join(cl_lines) or "  (Chưa có kết quả kiểm định)"
 
-    prompt = f"""Bạn là chuyên gia định giá laptop cũ tại thị trường Việt Nam.
-Hãy phân tích thông tin dưới đây và đưa ra đề xuất giá thu mua (nhập từ khách) và giá bán ra (bán lại).
+    prompt = f"""Bạn là chuyên gia định giá laptop cũ tại thị trường Việt Nam (năm 2025).
+Phân tích thông tin sau và trả về JSON CHÍNH XÁC theo format yêu cầu.
 
 === CẤU HÌNH MÁY ===
 Hãng / Model  : {s.get('manufacturer','')} {s.get('model','')}
@@ -89,18 +89,44 @@ Pin           : {batt_str}
 Xếp hạng : {grade}  |  Tổng điểm phạt: {score}
 {cl_summary}
 
-=== YÊU CẦU ===
-1. Đánh giá tổng quan máy (2-3 câu ngắn gọn)
-2. Điểm mạnh và điểm yếu chính
-3. Đề xuất GIÁ THU MUA (VNĐ) — khoảng min~max
-4. Đề xuất GIÁ BÁN RA (VNĐ) — khoảng min~max
-5. Lý do định giá (dựa trên thị trường laptop cũ VN hiện tại)
-6. Lời khuyên cho người mua hàng
+=== YÊU CẦU OUTPUT ===
+Trả về JSON hợp lệ (không có text thừa, không có markdown), đơn vị giá là VNĐ nguyên (số nguyên):
 
-Trả lời bằng tiếng Việt, ngắn gọn, thực tế.
-Format rõ ràng với các mục được đánh số."""
+{{
+  "buy_min": <giá thu mua thấp nhất, số nguyên VNĐ>,
+  "buy_max": <giá thu mua cao nhất, số nguyên VNĐ>,
+  "sell_min": <giá bán ra thấp nhất, số nguyên VNĐ>,
+  "sell_max": <giá bán ra cao nhất, số nguyên VNĐ>,
+  "summary": "<đánh giá tổng quan 1-2 câu>",
+  "strengths": ["<điểm mạnh 1>", "<điểm mạnh 2>"],
+  "weaknesses": ["<điểm yếu 1>", "<điểm yếu 2>"],
+  "reasoning": "<lý do định giá ngắn gọn>"
+}}"""
 
     return prompt
+
+
+def parse_result(raw: str) -> dict:
+    """Parse JSON từ response Gemini. Fallback về dict rỗng nếu lỗi."""
+    text = raw.strip()
+    # Bỏ markdown code block nếu có
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except Exception:
+        # Thử tìm JSON object trong text
+        start = text.find("{")
+        end   = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            try:
+                return json.loads(text[start:end])
+            except Exception:
+                pass
+        return {"_raw": raw}  # fallback giữ text gốc
 
 
 def get_price_estimate(hw: dict, answers: dict, checklist: list,

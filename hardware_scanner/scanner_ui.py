@@ -710,50 +710,99 @@ class ScannerApp(tk.Tk):
         # Header AI
         ai_hdr = tk.Frame(f, bg="#2D1B69", pady=6)
         ai_hdr.pack(fill="x")
-        tk.Label(ai_hdr, text="🤖  Gemini AI — Phân tích & Định giá",
+        tk.Label(ai_hdr, text="🤖  Gemini AI Định giá",
                  font=FH, fg=WHITE, bg="#2D1B69").pack()
 
         if result.startswith("__ERROR__"):
-            err = result[9:]
-            tk.Label(f, text=f"❌ {err}", font=FS, fg=RED, bg=CARD,
+            tk.Label(f, text=f"❌ {result[9:]}", font=FS, fg=RED, bg=CARD,
                      wraplength=260, justify="left", padx=8, pady=6).pack(fill="x")
-
-            tk.Button(f, text="↺  Thử lại", font=FS,
-                      bg=BORDER, fg=TEXT, relief="flat",
-                      padx=10, pady=3, cursor="hand2",
-                      command=lambda k=cache_key: self._retry_ai(k)
-                      ).pack(pady=4)
+            tk.Button(f, text="↺  Thử lại", font=FS, bg=BORDER, fg=TEXT,
+                      relief="flat", padx=10, pady=3, cursor="hand2",
+                      command=lambda k=cache_key: self._retry_ai(k)).pack(pady=4)
             return
 
-        # Render kết quả từng dòng
-        txt_frame = tk.Frame(f, bg=CARD)
-        txt_frame.pack(fill="x", padx=4, pady=4)
+        # Parse JSON từ Gemini
+        data = gemini_pricer.parse_result(result)
+        raw_text = data.get("_raw", result)  # fallback nếu parse lỗi
 
-        for line in result.splitlines():
-            stripped = line.strip()
-            if not stripped:
-                tk.Frame(txt_frame, bg=CARD, height=4).pack()
-                continue
-            is_head = (stripped[:2].rstrip(".").isdigit() or
-                       stripped.startswith("**") or stripped.startswith("##"))
-            clean = stripped.lstrip("#").replace("**", "").lstrip("-•").strip()
-            tk.Label(txt_frame, text=clean,
-                     font=FH if is_head else FS,
-                     fg=ACCENT if is_head else TEXT,
-                     bg=CARD, anchor="w",
-                     wraplength=250, justify="left",
-                     padx=8, pady=0).pack(fill="x")
+        if data.get("buy_min"):
+            # ── Card GIÁ THU MUA ──────────────────────────────────────────
+            buy_card = tk.Frame(f, bg="#0D3B0D", pady=10)
+            buy_card.pack(fill="x", padx=6, pady=(6, 2))
 
-        # Copy button
-        def copy_text():
+            tk.Label(buy_card, text="GIÁ THU MUA",
+                     font=("Segoe UI", 9, "bold"), fg="#86EFAC", bg="#0D3B0D").pack()
+
+            buy_lo = f"{data['buy_min']:,.0f}".replace(",", ".")
+            buy_hi = f"{data['buy_max']:,.0f}".replace(",", ".")
+            tk.Label(buy_card,
+                     text=f"{buy_lo} – {buy_hi} đ",
+                     font=("Segoe UI", 18, "bold"), fg=GREEN, bg="#0D3B0D").pack()
+
+            # ── Card GIÁ BÁN RA ───────────────────────────────────────────
+            sell_card = tk.Frame(f, bg="#0C2340", pady=8)
+            sell_card.pack(fill="x", padx=6, pady=(2, 6))
+
+            tk.Label(sell_card, text="GIÁ BÁN RA",
+                     font=("Segoe UI", 9, "bold"), fg="#93C5FD", bg="#0C2340").pack()
+
+            sell_lo = f"{data['sell_min']:,.0f}".replace(",", ".")
+            sell_hi = f"{data['sell_max']:,.0f}".replace(",", ".")
+            tk.Label(sell_card,
+                     text=f"{sell_lo} – {sell_hi} đ",
+                     font=("Segoe UI", 14, "bold"), fg=ACCENT, bg="#0C2340").pack()
+
+            tk.Frame(f, bg=BORDER, height=1).pack(fill="x", padx=6, pady=2)
+
+            # ── Tóm tắt ───────────────────────────────────────────────────
+            if data.get("summary"):
+                tk.Label(f, text=data["summary"], font=FS, fg=TEXT, bg=CARD,
+                         wraplength=255, justify="left",
+                         padx=8, pady=4).pack(fill="x")
+
+            # Điểm mạnh / yếu
+            for item in data.get("strengths", []):
+                tk.Label(f, text=f"✅ {item}", font=FS, fg=GREEN, bg=CARD,
+                         wraplength=255, justify="left", padx=8).pack(fill="x")
+            for item in data.get("weaknesses", []):
+                tk.Label(f, text=f"⚠️ {item}", font=FS, fg=YELLOW, bg=CARD,
+                         wraplength=255, justify="left", padx=8).pack(fill="x")
+
+            if data.get("reasoning"):
+                tk.Frame(f, bg=BORDER, height=1).pack(fill="x", padx=6, pady=2)
+                tk.Label(f, text=data["reasoning"], font=FS, fg=DIM, bg=CARD,
+                         wraplength=255, justify="left",
+                         padx=8, pady=2).pack(fill="x")
+
+            # Copy giá thu mua
+            copy_str = (f"{data.get('summary','')}\n"
+                        f"Thu mua: {buy_lo} – {buy_hi} đ\n"
+                        f"Bán ra:  {sell_lo} – {sell_hi} đ")
+        else:
+            # Fallback: Gemini trả text thường
+            copy_str = raw_text
+            for line in raw_text.splitlines():
+                s = line.strip()
+                if not s:
+                    tk.Frame(f, bg=CARD, height=3).pack()
+                    continue
+                is_head = s[:2].rstrip(".").isdigit() or s.startswith("**")
+                clean = s.lstrip("#").replace("**","").lstrip("-•").strip()
+                tk.Label(f, text=clean,
+                         font=FH if is_head else FS,
+                         fg=ACCENT if is_head else TEXT,
+                         bg=CARD, anchor="w", wraplength=255,
+                         justify="left", padx=8).pack(fill="x")
+
+        def copy_result():
             self.clipboard_clear()
-            self.clipboard_append(result)
+            self.clipboard_append(copy_str)
             self._status.config(text="Đã copy kết quả AI")
 
         tk.Button(f, text="📋  Copy", font=FS,
                   bg=BORDER, fg=DIM, relief="flat",
                   padx=8, pady=2, cursor="hand2",
-                  command=copy_text).pack(pady=(4, 6))
+                  command=copy_result).pack(pady=(4, 6))
 
     def _retry_ai(self, old_key):
         """Xoá cache lỗi, gọi lại AI."""
