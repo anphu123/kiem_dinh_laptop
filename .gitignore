@@ -23,3 +23,5 @@ Thumbs.db
 # Cấu hình bí mật — KHÔNG commit
 hardware_scanner/.env
 .env
+hardware_scanner/_embedded_key.py
+_embedded_key.py

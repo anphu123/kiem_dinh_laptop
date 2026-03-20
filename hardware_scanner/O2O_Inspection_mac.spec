@@ -40,6 +40,8 @@ a = Analysis(
         # SSL / certifi
         'certifi',
         'ssl',
+        # Embedded key (generated at build time)
+        '_embedded_key',
     ],
     hookspath=[],
     hooksconfig={},

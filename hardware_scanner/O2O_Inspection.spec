@@ -42,6 +42,8 @@ a = Analysis(
         # SSL / certifi
         'certifi',
         'ssl',
+        # Embedded key (generated at build time)
+        '_embedded_key',
         # tkinter (đảm bảo bundled)
         'tkinter',
         'tkinter.ttk',

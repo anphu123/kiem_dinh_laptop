@@ -31,6 +31,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller psutil "qrcode[pil]" wmi pywin32 certifi
 
+      - name: Inject API key (bake vào binary)
+        working-directory: hardware_scanner
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-2.5-flash
+        run: python build_inject_key.py
+
       - name: Build EXE
         working-directory: hardware_scanner
         run: pyinstaller O2O_Inspection.spec --clean --noconfirm
@@ -62,6 +69,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller psutil "qrcode[pil]" certifi
 
+      - name: Inject API key (bake vào binary)
+        working-directory: hardware_scanner
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-2.5-flash
+        run: python build_inject_key.py
+
       - name: Build .app
         working-directory: hardware_scanner
         run: pyinstaller O2O_Inspection_mac.spec --clean --noconfirm
@@ -77,7 +91,7 @@ jobs:
           path: hardware_scanner/dist/O2O_Inspection_mac.zip
           retention-days: 30
 
-  # ── Tạo GitHub Release (chỉ khi push tag) ────────────────────────────────
+  # ── Tạo GitHub Release ────────────────────────────────────────────────────
   release:
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
@@ -109,12 +123,13 @@ jobs:
             | `O2O_Inspection_mac.zip` | macOS 12+ (Intel & Apple Silicon) |
 
             ### Cách dùng
-            **Windows:** Double-click `O2O_Inspection.exe` — không cần cài Python
+            **Windows:** Double-click `O2O_Inspection.exe` — không cần cài Python, không cần .env
 
-            **macOS:** Giải nén zip → kéo `O2O_Inspection.app` vào Applications → mở lần đầu: chuột phải → Open
+            **macOS:** Giải nén zip → chuột phải → Open (lần đầu)
 
             ### Lưu ý
-            - Chạy với quyền Admin/sudo để đọc đầy đủ thông tin BIOS và pin
+            - Chạy với quyền Admin để đọc đầy đủ thông tin BIOS và pin
+            - AI định giá đã được tích hợp sẵn, không cần cấu hình thêm
           files: |
             release/O2O_Inspection.exe
             release/O2O_Inspection_mac.zip
