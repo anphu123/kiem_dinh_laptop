@@ -16,7 +16,6 @@ from controllers.scan_controller import ScanController
 from controllers.checklist_controller import ChecklistController
 from controllers.pricing_controller import PricingController
 from controllers.cam_mic_controller import CamMicController
-from controllers.warranty_controller import WarrantyController
 from views.wizard import WizardView
 from views.sidebar import Sidebar
 from views.components.theme import C
@@ -38,11 +37,10 @@ def main(page: ft.Page):
         pass
 
     # ── Controllers ───────────────────────────────────────────────────────────
-    scan_ctrl     = ScanController()
-    cl_ctrl       = ChecklistController()
-    price_ctrl    = PricingController()
-    cam_mic_ctrl  = CamMicController()
-    warranty_ctrl = WarrantyController()
+    scan_ctrl    = ScanController()
+    cl_ctrl      = ChecklistController()
+    price_ctrl   = PricingController()
+    cam_mic_ctrl = CamMicController()
 
     # ── Views ─────────────────────────────────────────────────────────────────
     sidebar = Sidebar(page)
@@ -52,7 +50,6 @@ def main(page: ft.Page):
         cl_ctrl=cl_ctrl,
         on_cam_mic_test=cam_mic_ctrl.test,
         on_speaker_test=cam_mic_ctrl.test_speaker,
-        on_warranty_lookup=warranty_ctrl.lookup,
         # on_screen_result wired sau khi status_text có
     )
 
@@ -64,7 +61,6 @@ def main(page: ft.Page):
         txn_text.value = _new_txn_id()
         # Reset toàn bộ trạng thái transaction cũ
         scan_ctrl.reset()
-        warranty_ctrl.reset()
         price_ctrl.reset()
         cam_mic_ctrl.reset()
         cl_ctrl.reset()
@@ -197,7 +193,7 @@ def main(page: ft.Page):
         elif not cam.cameras:
             wizard.auto_answer_checklist("camera", 2)
 
-        wizard.on_scan_done(data)   # marks scan done + triggers warranty + advance
+        wizard.on_scan_done(data)   # marks scan done + advance to screen
 
         sn = data.system.serial_number
         status_text.value = f"✓ Quét xong  •  SN: {sn}"
@@ -324,31 +320,6 @@ def main(page: ft.Page):
         on_speaker_done=on_speaker_done,
         on_speaker_start=on_speaker_start,
     )
-
-    # ── Wire warranty callbacks ───────────────────────────────────────────────
-
-    def on_warranty_start():
-        status_text.value = "🛡️ Đang tra cứu bảo hành..."
-        wizard.set_warranty_loading()
-        try:
-            page.update()
-        except Exception:
-            pass
-
-    def on_warranty_result(result):
-        wizard.set_warranty_result(result)
-        if result.error:
-            status_text.value = f"⚠ Bảo hành: {result.error}"
-        elif result.items:
-            status_text.value = f"✓ Bảo hành: tìm thấy {len(result.items)} sản phẩm"
-        else:
-            status_text.value = "🛡️ Bảo hành: không tìm thấy dữ liệu"
-        try:
-            page.update()
-        except Exception:
-            pass
-
-    warranty_ctrl.set_callbacks(on_start=on_warranty_start, on_result=on_warranty_result)
 
     # ── Kick off first scan ───────────────────────────────────────────────────
     start_scan()

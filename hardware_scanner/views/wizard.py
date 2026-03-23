@@ -1,14 +1,13 @@
 """
 View: Wizard — bố cục kiểm định tự động từng bước.
-Thay thế 3-tab layout bằng 6 step cards xếp dọc.
+Thay thế 3-tab layout bằng 5 step cards xếp dọc.
 
 Flow tự động:
   ① Quét phần cứng   (auto-run)
-  ② Tra cứu bảo hành (auto-run sau khi scan xong)
-  ③ Màn hình          (user bắt đầu + xác nhận kết quả)
-  ④ Camera, Mic & Loa (auto-run khi step activate)
-  ⑤ Bàn phím          (user tự nhấn phím, bấm Tiếp theo)
-  ⑥ Kiểm định ngoại quan (user điền, auto-done khi xong hết)
+  ② Màn hình          (user bắt đầu + xác nhận kết quả)
+  ③ Camera, Mic & Loa (auto-run khi step activate)
+  ④ Bàn phím          (user tự nhấn phím, bấm Tiếp theo)
+  ⑤ Kiểm định ngoại quan (user điền, auto-done khi xong hết)
 """
 from __future__ import annotations
 
@@ -23,7 +22,6 @@ from views.hardware_tab import HardwareTab
 from views.checklist_tab import ChecklistTab
 from views.components.cam_mic_widget import CamMicWidget
 from views.components.keyboard_test import KeyboardTestWidget
-from views.components.warranty_widget import WarrantyWidget
 from views.components.screen_test import ScreenTestWidget
 from views.components.theme import C
 
@@ -31,11 +29,10 @@ from views.components.theme import C
 
 _STEPS = [
     dict(id="scan",      num="①", icon="💻", title="Quét phần cứng"),
-    dict(id="warranty",  num="②", icon="🛡️", title="Tra cứu bảo hành"),
-    dict(id="screen",    num="③", icon="🖥️", title="Màn hình"),
-    dict(id="camera",    num="④", icon="📷", title="Camera, Mic & Loa"),
-    dict(id="keyboard",  num="⑤", icon="⌨️", title="Bàn phím"),
-    dict(id="checklist", num="⑥", icon="✅", title="Kiểm định ngoại quan"),
+    dict(id="screen",    num="②", icon="🖥️", title="Màn hình"),
+    dict(id="camera",    num="③", icon="📷", title="Camera, Mic & Loa"),
+    dict(id="keyboard",  num="④", icon="⌨️", title="Bàn phím"),
+    dict(id="checklist", num="⑤", icon="✅", title="Kiểm định ngoại quan"),
 ]
 
 _STEP_ORDER = [s["id"] for s in _STEPS]
@@ -51,12 +48,10 @@ class WizardView:
         cl_ctrl: ChecklistController,
         on_cam_mic_test: Callable,
         on_speaker_test: Callable,
-        on_warranty_lookup: Callable[[str, int], None],
         on_screen_result: Optional[Callable[[bool], None]] = None,
     ):
         self._page = page
         self._cl_ctrl = cl_ctrl
-        self._on_warranty_lookup = on_warranty_lookup
         self._on_cam_mic_test = on_cam_mic_test
         self._ext_screen_cb = on_screen_result
 
@@ -66,8 +61,6 @@ class WizardView:
 
         # ── Sub-widgets ────────────────────────────────────────────────────────
         self._hw_tab = HardwareTab(page)
-
-        self._warranty = WarrantyWidget(page, on_lookup=on_warranty_lookup)
 
         self._screen = ScreenTestWidget(
             page,
@@ -104,7 +97,7 @@ class WizardView:
         self._prog_bar  = ft.ProgressBar(
             value=0, color=C["accent"], bgcolor=C["border"], height=4,
         )
-        self._prog_text = ft.Text("0 / 6 bước hoàn thành", size=10, color=C["dim"])
+        self._prog_text = ft.Text("0 / 5 bước hoàn thành", size=10, color=C["dim"])
 
         # ── Main column ───────────────────────────────────────────────────────
         self._col = ft.Column(
@@ -155,9 +148,6 @@ class WizardView:
         # Set model cho keyboard layout
         self._keyboard.set_model(model)
 
-        # Pre-fill serial vào warranty
-        self._warranty.set_keyword(self._serial)
-
         # Tóm tắt
         cpu = data.cpu.name.split("@")[0].strip() if data.cpu.name else "?"
         ram = f"{data.ram.total_gb:.0f}GB"
@@ -165,27 +155,6 @@ class WizardView:
         summary = f"{data.system.model}  •  {cpu}  •  {ram} RAM  •  {disk} SSD"
         self._mark_done("scan", summary)
 
-        # Auto-advance → warranty (tự tra cứu luôn)
-        self._activate_step("warranty")
-        if self._serial:
-            self._on_warranty_lookup(self._serial, 2)
-
-    def set_warranty_loading(self):
-        self._warranty.set_loading()
-
-    def set_warranty_result(self, result):
-        self._warranty.set_result(result)
-        if result.error:
-            summary = f"⚠ {result.error[:50]}"
-        elif result.items:
-            first = result.items[0]
-            status = first.warranty_status or "Tìm thấy"
-            summary = f"🛡️ {first.product_name or self._serial}  •  {status}"
-        elif result.raw_message:
-            summary = result.raw_message[:60]
-        else:
-            summary = "Không tìm thấy dữ liệu bảo hành"
-        self._mark_done("warranty", summary)
         # Auto-advance → màn hình + tự fullscreen luôn
         self._activate_step("screen")
         self._screen.start()
@@ -350,9 +319,9 @@ class WizardView:
         self._on_cam_mic_test()
 
     def _update_progress(self):
-        done = sum(1 for s in _STEP_ORDER if self._status[s] == "done")
+        done  = sum(1 for s in _STEP_ORDER if self._status[s] == "done")
         total = len(_STEP_ORDER)
-        self._prog_bar.value  = done / total
+        self._prog_bar.value  = done / total if total else 0
         self._prog_text.value = f"{done} / {total} bước hoàn thành"
         try:
             self._prog_bar.update()
@@ -447,9 +416,6 @@ class WizardView:
     def _build_content(self, sid: str) -> ft.Control:
         if sid == "scan":
             return self._hw_tab.build()
-
-        if sid == "warranty":
-            return self._warranty.build()
 
         if sid == "screen":
             return self._screen.build()
