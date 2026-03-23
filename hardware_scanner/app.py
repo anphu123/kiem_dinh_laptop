@@ -5,6 +5,7 @@ Flow tự động từng bước: Scan → Bảo hành → Màn hình → Camera
 """
 from __future__ import annotations
 
+import platform
 import threading
 import time
 import uuid
@@ -21,6 +22,34 @@ from views.sidebar import Sidebar
 from views.components.theme import C
 
 
+def _request_permissions_macos():
+    """
+    macOS: probe camera + mic ngay lúc khởi động để trigger permission dialog sớm.
+    Chạy trong background thread, không block UI.
+    """
+    if platform.system() != "Darwin":
+        return
+
+    def _probe():
+        # Probe camera → trigger NSCameraUsageDescription dialog
+        try:
+            import cv2
+            cap = cv2.VideoCapture(0)
+            cap.release()
+        except Exception:
+            pass
+        # Probe mic → trigger NSMicrophoneUsageDescription dialog
+        try:
+            import sounddevice as sd
+            sd.query_devices()
+            sd.rec(1, samplerate=8000, channels=1, dtype="float32", blocking=False)
+            sd.stop()
+        except Exception:
+            pass
+
+    threading.Thread(target=_probe, daemon=True).start()
+
+
 def main(page: ft.Page):
     page.title = "O2O Laptop Inspection"
     page.bgcolor = C["bg"]
@@ -35,6 +64,9 @@ def main(page: ft.Page):
         page.window.min_height = 640
     except Exception:
         pass
+
+    # Xin quyền camera + mic sớm (macOS permission dialog)
+    _request_permissions_macos()
 
     # ── Controllers ───────────────────────────────────────────────────────────
     scan_ctrl    = ScanController()
