@@ -59,7 +59,12 @@ jobs:
             --hidden-import gemini_pricer `
             --hidden-import scanner `
             --hidden-import cv2 `
-            --hidden-import sounddevice
+            --hidden-import sounddevice `
+            --pyinstaller-build-args --noupx
+
+      - name: Unblock EXE (xóa Zone.Identifier ADS)
+        working-directory: hardware_scanner/dist
+        run: Unblock-File -Path O2O_Inspection.exe
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -175,7 +180,10 @@ jobs:
             | `O2O_Inspection_mac.zip` | macOS 12+ (Intel & Apple Silicon) |
 
             ### Cách dùng
-            **Windows:** Double-click `O2O_Inspection.exe` — không cần cài Python
+            **Windows — lần đầu mở:**
+            1. Download `O2O_Inspection.exe`
+            2. Nếu SmartScreen hiện cảnh báo → click **"More info"** → **"Run anyway"**
+            3. Hoặc: chuột phải vào file → **Properties** → tick **Unblock** → OK
 
             **macOS — lần đầu mở:**
             1. Giải nén zip → kéo `.app` vào thư mục Applications (hoặc để trên Desktop)
