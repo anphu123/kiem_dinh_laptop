@@ -60,8 +60,7 @@ jobs:
             --hidden-import scanner `
             --hidden-import cv2 `
             --hidden-import sounddevice `
-            --uac-admin `
-            --pyinstaller-build-args --noupx
+            --uac-admin
 
       - name: Unblock EXE (xóa Zone.Identifier ADS)
         working-directory: hardware_scanner/dist
