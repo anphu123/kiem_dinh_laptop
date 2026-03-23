@@ -45,7 +45,7 @@ jobs:
       - name: Build EXE
         working-directory: hardware_scanner
         run: |
-          python -m flet pack app.py `
+          flet pack app.py `
             --name O2O_Inspection `
             --add-data "_embedded_key.py;." `
             --add-data "checklist.json;." `
@@ -106,7 +106,7 @@ jobs:
       - name: Build .app
         working-directory: hardware_scanner
         run: |
-          python -m flet pack app.py \
+          flet pack app.py \
             --name O2O_Inspection \
             --add-data "_embedded_key.py:." \
             --add-data "checklist.json:." \
