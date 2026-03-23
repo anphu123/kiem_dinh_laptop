@@ -45,7 +45,27 @@ jobs:
 
       - name: Build EXE
         working-directory: hardware_scanner
-        run: pyinstaller O2O_Inspection.spec --clean --noconfirm
+        run: |
+          python -m flet pack app.py `
+            --name O2O_Inspection `
+            --add-data "_embedded_key.py;." `
+            --add-data "checklist.json;." `
+            --hidden-import _embedded_key `
+            --hidden-import controllers.scan_controller `
+            --hidden-import controllers.checklist_controller `
+            --hidden-import controllers.pricing_controller `
+            --hidden-import controllers.cam_mic_controller `
+            --hidden-import controllers.warranty_controller `
+            --hidden-import models.hardware `
+            --hidden-import models.checklist `
+            --hidden-import models.pricing `
+            --hidden-import gemini_pricer `
+            --hidden-import scanner `
+            --hidden-import cv2 `
+            --hidden-import sounddevice `
+            --hidden-import bs4 `
+            --hidden-import playwright `
+            --hidden-import playwright.sync_api
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -84,11 +104,37 @@ jobs:
 
       - name: Build .app
         working-directory: hardware_scanner
-        run: pyinstaller O2O_Inspection_mac.spec --clean --noconfirm
+        run: |
+          python -m flet pack app.py \
+            --name O2O_Inspection \
+            --add-data "_embedded_key.py:." \
+            --add-data "checklist.json:." \
+            --hidden-import _embedded_key \
+            --hidden-import controllers.scan_controller \
+            --hidden-import controllers.checklist_controller \
+            --hidden-import controllers.pricing_controller \
+            --hidden-import controllers.cam_mic_controller \
+            --hidden-import controllers.warranty_controller \
+            --hidden-import models.hardware \
+            --hidden-import models.checklist \
+            --hidden-import models.pricing \
+            --hidden-import gemini_pricer \
+            --hidden-import scanner \
+            --hidden-import cv2 \
+            --hidden-import sounddevice \
+            --hidden-import bs4 \
+            --hidden-import playwright \
+            --hidden-import playwright.sync_api
 
       - name: Zip .app bundle
-        working-directory: hardware_scanner/dist
-        run: zip -r O2O_Inspection_mac.zip O2O_Inspection.app
+        run: |
+          cd hardware_scanner/dist
+          # flet pack tạo thư mục app, zip toàn bộ
+          if [ -d "O2O_Inspection.app" ]; then
+            zip -r O2O_Inspection_mac.zip O2O_Inspection.app
+          else
+            zip -r O2O_Inspection_mac.zip O2O_Inspection
+          fi
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
