@@ -8,7 +8,7 @@ C = {
     "card":   "#FFFFFF",  # white
     "card2":  "#F8FAFC",  # slate-50
     "border": "#E2E8F0",  # slate-200
-    "accent": "#2563EB",  # blue-600
+    "accent": "#F97316",  # orange-500 (TNM brand)
     "green":  "#16A34A",  # green-600
     "yellow": "#D97706",  # amber-600
     "red":    "#DC2626",  # red-600

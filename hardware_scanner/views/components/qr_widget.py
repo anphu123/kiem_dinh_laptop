@@ -135,7 +135,7 @@ class QrWidget:
 
         def save_qr(_):
             try:
-                path = os.path.join(tempfile.gettempdir(), f"o2o_qr_{sn}.png")
+                path = os.path.join(tempfile.gettempdir(), f"easyswap_qr_{sn}.png")
                 with open(path, "wb") as f:
                     f.write(base64.b64decode(b64))
                 if platform.system() == "Windows":

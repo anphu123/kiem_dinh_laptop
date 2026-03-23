@@ -112,7 +112,7 @@ class WarrantyWidget:
             rows.append(ft.Container(
                 content=ft.Row([
                     ft.ProgressRing(width=16, height=16, stroke_width=2, color=C["accent"]),
-                    ft.Text("Đang tra cứu bảo hành...", size=10, color=C["dim"]),
+                    ft.Text("AI đang thẩm định...", size=10, color=C["accent"]),
                 ], spacing=8),
                 padding=ft.padding.symmetric(horizontal=8, vertical=8),
             ))

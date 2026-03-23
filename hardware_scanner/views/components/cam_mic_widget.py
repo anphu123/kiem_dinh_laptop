@@ -79,7 +79,7 @@ class CamMicWidget:
         if self._speaker_loading:
             content = ft.Row([
                 ft.ProgressRing(width=16, height=16, stroke_width=2, color=C["accent"]),
-                ft.Text("Đang phát âm thanh...", size=10, color=C["dim"]),
+                ft.Text("AI đang thẩm định...", size=10, color=C["accent"]),
             ], spacing=8)
         elif self._speaker_ok is True:
             content = ft.Row([
@@ -123,7 +123,7 @@ class CamMicWidget:
             content=ft.Row(
                 [
                     ft.ProgressRing(width=18, height=18, stroke_width=2, color=C["accent"]),
-                    ft.Text("Đang mở camera & mic...", size=10, color=C["dim"]),
+                    ft.Text("AI đang thẩm định...", size=10, color=C["accent"]),
                 ],
                 spacing=8,
             ),

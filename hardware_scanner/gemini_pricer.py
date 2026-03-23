@@ -1,5 +1,5 @@
 """
-O2O Laptop Inspection - Gemini AI Pricer
+Easy Swap Inspection - Gemini AI Pricer
 Gọi Gemini API để phân tích cấu hình + kết quả kiểm định → đề xuất giá.
 """
 

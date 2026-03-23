@@ -51,7 +51,7 @@ def _request_permissions_macos():
 
 
 def main(page: ft.Page):
-    page.title = "EASY SWAP LAPTOP"
+    page.title = "Easy Swap Inspection"
     page.bgcolor = C["bg"]
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
@@ -140,7 +140,7 @@ def main(page: ft.Page):
         ft.Container(
             content=ft.Row([
                 ft.Text(
-                    "O2O  LAPTOP  INSPECTION",
+                    "EASY SWAP",
                     size=20, weight=ft.FontWeight.BOLD, color=C["accent"],
                 ),
                 ft.Container(content=txn_text, expand=True, alignment=ft.alignment.center),
@@ -174,7 +174,7 @@ def main(page: ft.Page):
             expand=True,
             padding=0,
         ),
-        # Footer
+        # Footer — status + rescan
         ft.Container(
             content=ft.Row([
                 status_text,
@@ -187,6 +187,18 @@ def main(page: ft.Page):
             bgcolor=C["card"],
             padding=ft.padding.symmetric(horizontal=20, vertical=8),
             border=ft.border.only(top=ft.border.BorderSide(1, C["border"])),
+        ),
+        # Copyright bar
+        ft.Container(
+            content=ft.Row([
+                ft.Text("© 2025 TNM Group", size=9, color="white",
+                        weight=ft.FontWeight.BOLD),
+                ft.Text("•", size=9, color="white"),
+                ft.Text("All rights reserved", size=9, color="white"),
+            ], spacing=8),
+            bgcolor=C["accent"],
+            padding=ft.padding.symmetric(horizontal=20, vertical=4),
+            alignment=ft.alignment.center,
         ),
     )
 

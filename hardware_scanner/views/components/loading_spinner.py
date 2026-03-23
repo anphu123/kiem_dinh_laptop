@@ -23,8 +23,8 @@ class LoadingSpinner:
                     stroke_width=4, color=C["accent"],
                 ),
                 ft.Text(
-                    "Đang quét cấu hình máy...",
-                    size=11, weight=ft.FontWeight.BOLD, color=C["text"],
+                    "AI đang thẩm định...",
+                    size=11, weight=ft.FontWeight.BOLD, color=C["accent"],
                 ),
                 self._progress,
             ],

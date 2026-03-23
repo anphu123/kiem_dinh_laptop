@@ -45,7 +45,7 @@ jobs:
         working-directory: hardware_scanner
         run: |
           flet pack app.py `
-            --name O2O_Inspection `
+            --name EasySwap_Inspection `
             --icon icon.ico `
             --add-data "_embedded_key.py;." `
             --add-data "checklist.json;." `
@@ -66,8 +66,8 @@ jobs:
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: O2O_Inspection_Windows
-          path: hardware_scanner/dist/O2O_Inspection.exe
+          name: EasySwap_Inspection_Windows
+          path: hardware_scanner/dist/EasySwap_Inspection.exe
           retention-days: 30
 
   # ── Build macOS .app ────────────────────────────────────────────────────────
@@ -103,10 +103,10 @@ jobs:
         working-directory: hardware_scanner
         run: |
           flet pack app.py \
-            --name O2O_Inspection \
+            --name EasySwap_Inspection \
             --icon icon.icns \
             --codesign-identity - \
-            --bundle-id com.o2o.laptop-inspection \
+            --bundle-id com.easyswap.inspection \
             --add-data "_embedded_key.py:." \
             --add-data "checklist.json:." \
             --hidden-import _embedded_key \
@@ -124,7 +124,7 @@ jobs:
 
       - name: Add macOS privacy usage descriptions
         run: |
-          PLIST=hardware_scanner/dist/O2O_Inspection.app/Contents/Info.plist
+          PLIST=hardware_scanner/dist/EasySwap_Inspection.app/Contents/Info.plist
           plutil -insert NSCameraUsageDescription \
             -string "Dùng để kiểm tra camera laptop trong quá trình kiểm định." "$PLIST"
           plutil -insert NSMicrophoneUsageDescription \
@@ -132,7 +132,7 @@ jobs:
 
       - name: Ad-hoc sign & strip quarantine
         run: |
-          APP=hardware_scanner/dist/O2O_Inspection.app
+          APP=hardware_scanner/dist/EasySwap_Inspection.app
           # Deep sign toàn bộ bundle (bao gồm frameworks, dylibs)
           codesign --force --deep --sign - "$APP"
           # Xóa quarantine flag khỏi bundle trước khi zip
@@ -140,24 +140,24 @@ jobs:
 
       - name: Create launcher script
         run: |
-          SCRIPT='#!/bin/bash\nDIR="$(cd "$(dirname "$0")" && pwd)"\nAPP="$DIR/O2O_Inspection.app"\nxattr -cr "$APP" 2>/dev/null\nopen "$APP"\n'
+          SCRIPT='#!/bin/bash\nDIR="$(cd "$(dirname "$0")" && pwd)"\nAPP="$DIR/EasySwap_Inspection.app"\nxattr -cr "$APP" 2>/dev/null\nopen "$APP"\n'
           printf '%b' "$SCRIPT" > hardware_scanner/dist/Mo_App.command
           chmod +x hardware_scanner/dist/Mo_App.command
 
       - name: Zip .app bundle
         run: |
           cd hardware_scanner/dist
-          if [ -d "O2O_Inspection.app" ]; then
-            zip -ry O2O_Inspection_mac.zip O2O_Inspection.app Mo_App.command
+          if [ -d "EasySwap_Inspection.app" ]; then
+            zip -ry EasySwap_Inspection_mac.zip EasySwap_Inspection.app Mo_App.command
           else
-            zip -ry O2O_Inspection_mac.zip O2O_Inspection Mo_App.command
+            zip -ry EasySwap_Inspection_mac.zip EasySwap_Inspection Mo_App.command
           fi
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: O2O_Inspection_macOS
-          path: hardware_scanner/dist/O2O_Inspection_mac.zip
+          name: EasySwap_Inspection_macOS
+          path: hardware_scanner/dist/EasySwap_Inspection_mac.zip
           retention-days: 30
 
   # ── GitHub Release ──────────────────────────────────────────────────────────
@@ -170,34 +170,34 @@ jobs:
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
-          name: O2O_Inspection_Windows
+          name: EasySwap_Inspection_Windows
           path: release/
 
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
-          name: O2O_Inspection_macOS
+          name: EasySwap_Inspection_macOS
           path: release/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "O2O Inspection ${{ github.ref_name }}"
+          name: "Easy Swap Inspection ${{ github.ref_name }}"
           body: |
-            ## O2O Laptop Inspection ${{ github.ref_name }}
+            ## Easy Swap Inspection ${{ github.ref_name }}
 
             | File | Hệ điều hành |
             |------|-------------|
-            | `O2O_Inspection.exe` | Windows 10 / 11 (64-bit) |
-            | `O2O_Inspection_mac.zip` | macOS 12+ (Intel & Apple Silicon) |
+            | `EasySwap_Inspection.exe` | Windows 10 / 11 (64-bit) |
+            | `EasySwap_Inspection_mac.zip` | macOS 12+ (Intel & Apple Silicon) |
 
             ### Cách dùng
             **Windows:**
-            1. Download `O2O_Inspection.exe`
+            1. Download `EasySwap_Inspection.exe`
             2. Nếu SmartScreen hiện cảnh báo → click **"More info"** → **"Run anyway"**
 
             **macOS:**
-            1. Giải nén `O2O_Inspection_mac.zip`
+            1. Giải nén `EasySwap_Inspection_mac.zip`
             2. **Chuột phải** vào `Mo_App.command` → **Open** → **Open**
             3. App tự khởi động (chỉ cần làm 1 lần)
 
@@ -213,7 +213,7 @@ jobs:
             ### Lưu ý
             - Chạy với quyền Admin/sudo để đọc đầy đủ BIOS, pin, serial
           files: |
-            release/O2O_Inspection.exe
-            release/O2O_Inspection_mac.zip
+            release/EasySwap_Inspection.exe
+            release/EasySwap_Inspection_mac.zip
           draft: false
           prerelease: false

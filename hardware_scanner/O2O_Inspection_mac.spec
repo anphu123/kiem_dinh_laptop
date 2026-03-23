@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec — macOS .app bundle  (v2.0)
-# Chạy: pyinstaller O2O_Inspection_mac.spec --clean --noconfirm
+# Chạy: pyinstaller EasySwap_Inspection_mac.spec --clean --noconfirm
 
 block_cipher = None
 
@@ -76,7 +76,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='O2O_Inspection',
+    name='EasySwap_Inspection',
     debug=False,
     strip=False,
     upx=False,
@@ -90,12 +90,12 @@ exe = EXE(
 
 app = BUNDLE(
     exe,
-    name='O2O_Inspection.app',
+    name='EasySwap_Inspection.app',
     icon='icon.icns',
-    bundle_identifier='com.o2o.laptop-inspection',
+    bundle_identifier='com.easyswap.inspection',
     info_plist={
-        'CFBundleName': 'O2O Inspection',
-        'CFBundleDisplayName': 'O2O Laptop Inspection',
+        'CFBundleName': 'Easy Swap',
+        'CFBundleDisplayName': 'Easy Swap Inspection',
         'CFBundleVersion': '2.0.0',
         'CFBundleShortVersionString': '2.0.0',
         'NSHighResolutionCapable': True,

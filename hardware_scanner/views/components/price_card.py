@@ -75,13 +75,13 @@ def _body(
 def _loading() -> ft.Control:
     return ft.Container(
         content=ft.Column([
-            ft.ProgressRing(width=28, height=28, stroke_width=3, color="#7C3AED"),
-            ft.Text("Gemini đang phân tích...", size=10,
-                    color="#7C3AED", text_align=ft.TextAlign.CENTER),
+            ft.ProgressRing(width=28, height=28, stroke_width=3, color=C["accent"]),
+            ft.Text("AI đang thẩm định...", size=10,
+                    color=C["accent"], text_align=ft.TextAlign.CENTER),
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
         alignment=ft.alignment.center,
         padding=ft.padding.symmetric(vertical=20),
-        bgcolor="#F5F3FF",
+        bgcolor="#FFF7ED",
     )
 
 

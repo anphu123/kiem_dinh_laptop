@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 > nul
 echo ====================================================
-echo   O2O Laptop Inspection - Build Windows EXE
+echo   Easy Swap Inspection - Build Windows EXE
 echo ====================================================
 echo.
 
@@ -19,7 +19,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [2/3] Build EXE tu spec file...
-pyinstaller O2O_Inspection.spec --clean --noconfirm
+pyinstaller EasySwap_Inspection.spec --clean --noconfirm
 if %errorlevel% neq 0 (
     echo.
     echo [LOI] Build that bai. Xem log tren.
@@ -29,10 +29,10 @@ if %errorlevel% neq 0 (
 echo [3/3] Hoan tat!
 echo.
 echo ====================================================
-echo   FILE EXE: dist\O2O_Inspection.exe
+echo   FILE EXE: dist\EasySwap_Inspection.exe
 echo ====================================================
 echo.
-echo   - Copy dist\O2O_Inspection.exe vao USB
+echo   - Copy dist\EasySwap_Inspection.exe vao USB
 echo   - Chay tren laptop Windows can test
 echo   - Khong can cai Python
 echo.

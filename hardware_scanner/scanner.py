@@ -1,5 +1,5 @@
 """
-O2O Laptop Inspection - Hardware Scanner
+Easy Swap Inspection - Hardware Scanner
 Chạy trên laptop cần test (Windows), thu thập cấu hình và sinh QR Code.
 Không cần cài đặt, không cần mạng - chạy từ USB.
 """
@@ -381,7 +381,7 @@ def get_battery_info():
 def _parse_windows_battery_report():
     """Chạy powercfg, parse HTML report để lấy capacity."""
     result = {}
-    tmp_path = os.path.join(tempfile.gettempdir(), "batteryreport_o2o.html")
+    tmp_path = os.path.join(tempfile.gettempdir(), "batteryreport_easyswap.html")
 
     try:
         subprocess.run(
@@ -869,7 +869,7 @@ def print_summary(data):
     storage = data["storage"]
 
     print("\n" + "=" * 60)
-    print("  O2O LAPTOP INSPECTION - KẾT QUẢ QUÉT CẤU HÌNH")
+    print("  EASY SWAP INSPECTION - KẾT QUẢ QUÉT CẤU HÌNH")
     print("=" * 60)
     print(f"  Hãng    : {s.get('manufacturer', 'N/A')}")
     print(f"  Model   : {s.get('model', 'N/A')}")
@@ -949,7 +949,7 @@ def generate_qr(data):
     img = qr.make_image(fill_color="black", back_color="white")
 
     # Lưu file và mở
-    qr_path = os.path.join(tempfile.gettempdir(), "o2o_laptop_qr.png")
+    qr_path = os.path.join(tempfile.gettempdir(), "easyswap_laptop_qr.png")
     img.save(qr_path)
 
     print(f"\n  QR Code đã lưu tại: {qr_path}")
@@ -975,7 +975,7 @@ def save_json(data, output_path=None):
     if output_path is None:
         output_path = os.path.join(
             tempfile.gettempdir(),
-            f"o2o_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            f"easyswap_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         )
 
     with open(output_path, "w", encoding="utf-8") as f:
@@ -986,7 +986,7 @@ def save_json(data, output_path=None):
 
 
 def main():
-    print("O2O Laptop Inspection - Hardware Scanner v1.0")
+    print("Easy Swap Inspection - Hardware Scanner v1.0")
     print("Đang khởi động...\n")
 
     try:

@@ -1,5 +1,5 @@
 """
-O2O Laptop Inspection - Hardware Scanner UI
+Easy Swap Inspection - Hardware Scanner UI
 Tab 1: Cấu hình phần cứng (auto-scan)
 Tab 2: Checklist kiểm định ngoại quan (trắc nghiệm)
 Panel phải: Grade + QR Code (scrollable)
@@ -213,7 +213,7 @@ def calc_grade(answers: dict):
 class ScannerApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("O2O Laptop Inspection")
+        self.title("Easy Swap Inspection")
         self.configure(bg=BG)
         self.resizable(True, True)
 
@@ -276,7 +276,7 @@ class ScannerApp(tk.Tk):
         hdr = tk.Frame(self, bg=CARD, pady=12)
         hdr.pack(fill="x")
 
-        tk.Label(hdr, text="O2O  LAPTOP  INSPECTION",
+        tk.Label(hdr, text="EASY SWAP  INSPECTION",
                  font=FT, fg=WHITE, bg=CARD).pack(side="left", padx=24)
 
         self._lbl_time = tk.Label(hdr, text="", font=FS, fg=DIM, bg=CARD)
@@ -949,7 +949,7 @@ class ScannerApp(tk.Tk):
 
     def _save_qr(self, img, sn):
         path = os.path.join(tempfile.gettempdir(),
-                            f"o2o_qr_{sn or 'unknown'}_{datetime.now():%H%M%S}.png")
+                            f"easyswap_qr_{sn or 'unknown'}_{datetime.now():%H%M%S}.png")
         img.save(path)
         self._status.config(text=f"✓ Đã lưu QR: {path}")
         try:

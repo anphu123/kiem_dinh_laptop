@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='O2O_Inspection',
+    name='EasySwap_Inspection',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -39,7 +39,7 @@ exe = EXE(
 )
 app = BUNDLE(
     exe,
-    name='O2O_Inspection.app',
+    name='EasySwap_Inspection.app',
     icon='icon.icns',
     bundle_identifier=None,
 )
