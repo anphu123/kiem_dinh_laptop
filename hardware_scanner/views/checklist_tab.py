@@ -43,6 +43,11 @@ class ChecklistTab:
 
     # ── Handlers ──────────────────────────────────────────────────────────────
 
+    def reset_visual(self):
+        """Xóa visual state radio buttons (không đụng controller)."""
+        for card in self._cards.values():
+            card.reset()
+
     def auto_answer(self, qid: str, idx: int):
         """Tự động chọn đáp án (gọi từ scan callback)."""
         if qid not in self._cards:
@@ -52,6 +57,10 @@ class ChecklistTab:
         self._sync_borders()
 
     def _on_answer(self, qid: str, idx: int):
+        # Sync Python-side value trước khi bất kỳ update() nào được gọi,
+        # tránh trường hợp card_refs.update() gửi rg.value cũ về Flutter.
+        if qid in self._cards:
+            self._cards[qid].radio_group.value = str(idx)
         self._ctrl.answer(qid, idx)
         self._sync_borders()
         self._page.update()

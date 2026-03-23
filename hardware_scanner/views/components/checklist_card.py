@@ -70,7 +70,8 @@ class ChecklistCard:
 
         rg = ft.RadioGroup(
             content=ft.Column(controls=radio_rows, spacing=0),
-            on_change=lambda e: self._on_answer(self._item.id, int(e.data)),
+            on_change=lambda e: self._on_answer(self._item.id, int(e.data))
+            if e.data is not None else None,
         )
 
         container = ft.Container(

@@ -185,6 +185,7 @@ class WizardView:
         self._cam_mic.reset()
         self._keyboard.reset()
         self._screen.reset()
+        self._cl_tab.reset_visual()   # xóa radio button selections từ session cũ
         self._serial = ""
         for sid in _STEP_ORDER:
             self._status[sid] = "pending"
