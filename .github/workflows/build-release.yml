@@ -62,22 +62,11 @@ jobs:
             --hidden-import sounddevice `
             --uac-admin
 
-      - name: Create Windows launcher & package zip
-        working-directory: hardware_scanner/dist
-        run: |
-          @"
-          @echo off
-          cd /d "%~dp0"
-          powershell -Command "Unblock-File -Path 'O2O_Inspection.exe'" 2>nul
-          start O2O_Inspection.exe
-          "@ | Out-File -FilePath Run_O2O.bat -Encoding ASCII
-          Compress-Archive -Path O2O_Inspection.exe,Run_O2O.bat -DestinationPath O2O_Inspection_win.zip -Force
-
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: O2O_Inspection_Windows
-          path: hardware_scanner/dist/O2O_Inspection_win.zip
+          path: hardware_scanner/dist/O2O_Inspection.exe
           retention-days: 30
 
   # ── Build macOS .app ────────────────────────────────────────────────────────
@@ -201,21 +190,14 @@ jobs:
             | `O2O_Inspection_mac.zip` | macOS 12+ (Intel & Apple Silicon) |
 
             ### Cách dùng
-            **Windows — lần đầu mở:**
+            **Windows:**
             1. Download `O2O_Inspection.exe`
             2. Nếu SmartScreen hiện cảnh báo → click **"More info"** → **"Run anyway"**
-            3. Hoặc: chuột phải vào file → **Properties** → tick **Unblock** → OK
 
-            **macOS — lần đầu mở (2 cách):**
-
-            **Cách 1 — Dùng script có sẵn (dễ nhất):**
-            1. Giải nén zip
-            2. Double-click `Mo_App.command` → nhấn **Open** khi macOS hỏi
-            3. App tự mở, không cần Terminal
-
-            **Cách 2 — Mở trực tiếp:**
-            1. Giải nén zip → kéo `O2O_Inspection.app` vào Applications
-            2. **Chuột phải** vào app → **Open** → **Open** (bỏ qua Gatekeeper lần đầu)
+            **macOS:**
+            1. Giải nén `O2O_Inspection_mac.zip`
+            2. **Chuột phải** vào `Mo_App.command` → **Open** → **Open**
+            3. App tự khởi động (chỉ cần làm 1 lần)
 
             ### Tính năng v2
             - **Wizard 5 bước tự động:** Scan → Màn hình → Camera/Mic/Loa → Bàn phím → Kiểm định ngoại quan
