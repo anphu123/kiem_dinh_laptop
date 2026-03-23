@@ -12,8 +12,6 @@ from typing import Optional
 class PricingResult:
     buy_min: Optional[int] = None
     buy_max: Optional[int] = None
-    sell_min: Optional[int] = None
-    sell_max: Optional[int] = None
     summary: str = ""
     strengths: list = field(default_factory=list)   # list[str]
     weaknesses: list = field(default_factory=list)  # list[str]
@@ -29,8 +27,6 @@ class PricingResult:
         return cls(
             buy_min=data.get("buy_min"),
             buy_max=data.get("buy_max"),
-            sell_min=data.get("sell_min"),
-            sell_max=data.get("sell_max"),
             summary=data.get("summary", ""),
             strengths=data.get("strengths", []),
             weaknesses=data.get("weaknesses", []),
@@ -51,11 +47,13 @@ class PricingResult:
         if self.has_prices:
             buy_lo = f"{self.buy_min:,.0f}".replace(",", ".")
             buy_hi = f"{self.buy_max:,.0f}".replace(",", ".")
-            sell_lo = f"{self.sell_min:,.0f}".replace(",", ".")
-            sell_hi = f"{self.sell_max:,.0f}".replace(",", ".")
-            return (
-                f"{self.summary}\n"
-                f"Thu mua: {buy_lo} – {buy_hi} đ\n"
-                f"Bán ra:  {sell_lo} – {sell_hi} đ"
-            )
+            lines = []
+            if self.summary:
+                lines.append(self.summary)
+            lines.append(f"Thu mua: {buy_lo} – {buy_hi} đ")
+            if self.strengths:
+                lines.append("Điểm cộng: " + "; ".join(self.strengths))
+            if self.weaknesses:
+                lines.append("Điểm trừ: " + "; ".join(self.weaknesses))
+            return "\n".join(lines)
         return self.raw

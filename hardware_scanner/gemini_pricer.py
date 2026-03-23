@@ -95,8 +95,6 @@ Trả về JSON hợp lệ (không có text thừa, không có markdown), đơn 
 {{
   "buy_min": <giá thu mua thấp nhất, số nguyên VNĐ>,
   "buy_max": <giá thu mua cao nhất, số nguyên VNĐ>,
-  "sell_min": <giá bán ra thấp nhất, số nguyên VNĐ>,
-  "sell_max": <giá bán ra cao nhất, số nguyên VNĐ>,
   "summary": "<đánh giá tổng quan 1-2 câu>",
   "strengths": ["<điểm mạnh 1>", "<điểm mạnh 2>"],
   "weaknesses": ["<điểm yếu 1>", "<điểm yếu 2>"],
