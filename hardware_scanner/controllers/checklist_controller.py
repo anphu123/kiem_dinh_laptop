@@ -47,6 +47,14 @@ class ChecklistController:
         self._answers[question_id] = option_index
         self._notify()
 
+    def sync_from_visual(self, visual: dict):
+        """
+        Nhận dict {qid: idx} từ visual state của tất cả RadioGroups.
+        Ghi đè answers và notify một lần — tránh mất on_change.
+        """
+        self._answers = {k: v for k, v in visual.items()}
+        self._notify()
+
     def reset(self):
         self._answers = {}
         self._notify()
