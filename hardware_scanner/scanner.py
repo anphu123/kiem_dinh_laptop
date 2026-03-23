@@ -39,12 +39,17 @@ def get_system_info():
         except ImportError:
             # Fallback nếu không có wmi
             info.update(_wmic_fallback_system())
+    elif platform.system() == "Darwin":
+        mac = _get_mac_system_info()
+        info["manufacturer"] = "Apple"
+        info["model"]         = mac.get("model", platform.machine())
+        info["serial_number"] = mac.get("serial", "Unknown")
+        info["bios_version"]  = mac.get("firmware", "N/A")
     else:
-        # macOS / Linux fallback (để dev/test)
-        info["manufacturer"] = "Apple" if platform.system() == "Darwin" else "Unknown"
-        info["model"] = platform.machine()
-        info["serial_number"] = _get_mac_serial()
-        info["bios_version"] = "N/A"
+        info["manufacturer"] = "Unknown"
+        info["model"]         = platform.machine()
+        info["serial_number"] = "Unknown"
+        info["bios_version"]  = "N/A"
 
     return info
 
@@ -82,17 +87,38 @@ def _wmic_fallback_system():
     return result
 
 
-def _get_mac_serial():
-    """Lấy serial trên macOS (dùng để dev)."""
+def _get_mac_system_info() -> dict:
+    """Parse system_profiler SPHardwareDataType → model, serial, firmware."""
+    result = {}
     try:
         out = subprocess.check_output(
             ["system_profiler", "SPHardwareDataType"],
             text=True, stderr=subprocess.DEVNULL
         )
-        match = re.search(r"Serial Number.*?:\s*(\S+)", out)
-        return match.group(1) if match else "Unknown"
+        def _field(pattern):
+            m = re.search(pattern, out, re.IGNORECASE)
+            return m.group(1).strip() if m else None
+
+        name       = _field(r"Model Name\s*:\s*(.+)")
+        identifier = _field(r"Model Identifier\s*:\s*(\S+)")
+        serial     = _field(r"Serial Number.*?:\s*(\S+)")
+        firmware   = _field(r"System Firmware Version\s*:\s*(.+)")
+
+        # Ghép "MacBook Air (MacBookAir10,1)"
+        if name and identifier:
+            result["model"] = f"{name} ({identifier})"
+        elif name:
+            result["model"] = name
+        elif identifier:
+            result["model"] = identifier
+
+        if serial:
+            result["serial"] = serial
+        if firmware:
+            result["firmware"] = firmware
     except Exception:
-        return "Unknown"
+        pass
+    return result
 
 
 def get_cpu_info():
@@ -341,8 +367,6 @@ def get_battery_info():
 
     if platform.system() == "Windows":
         battery.update(_parse_windows_battery_report())
-    elif platform.system() == "Darwin":
-        battery.update(_parse_mac_battery())
 
     # Tính % chai pin
     if battery.get("design_capacity_mwh") and battery.get("full_charge_capacity_mwh"):
@@ -592,6 +616,231 @@ def get_display_info():
     return displays
 
 
+def get_wifi_bluetooth_info():
+    """Tự động phát hiện WiFi và Bluetooth."""
+    if platform.system() == "Darwin":
+        return _mac_wifi_bluetooth()
+    if platform.system() == "Windows":
+        return _win_wifi_bluetooth()
+    return {"wifi": {}, "bluetooth": {}}
+
+
+def _mac_wifi_bluetooth():
+    result = {"wifi": {}, "bluetooth": {}}
+
+    # ── WiFi ──────────────────────────────────────────────────────────────────
+    try:
+        out = subprocess.check_output(
+            ["system_profiler", "SPAirPortDataType"],
+            text=True, stderr=subprocess.DEVNULL
+        )
+        wifi = {"present": True}
+        for line in out.splitlines():
+            s = line.strip()
+            if s.startswith("Card Type:"):
+                wifi["card_type"] = s.split(":", 1)[1].strip()
+            elif s.startswith("MAC Address:"):
+                wifi["mac"] = s.split(":", 1)[1].strip()
+            elif s.startswith("Supported PHY Modes:"):
+                wifi["phy_modes"] = s.split(":", 1)[1].strip()
+            elif s.startswith("Status:"):
+                wifi["status"] = s.split(":", 1)[1].strip()
+            elif s.startswith("PHY Mode:") and "current_phy" not in wifi:
+                wifi["current_phy"] = s.split(":", 1)[1].strip()
+            elif s.startswith("Signal / Noise:") and "signal" not in wifi:
+                parts = s.split(":", 1)[1].strip().split("/")
+                try:
+                    wifi["signal_dbm"] = int(parts[0].strip().split()[0])
+                    wifi["noise_dbm"] = int(parts[1].strip().split()[0])
+                except Exception:
+                    pass
+            elif s.startswith("Transmit Rate:") and "tx_rate" not in wifi:
+                wifi["tx_rate"] = s.split(":", 1)[1].strip()
+        result["wifi"] = wifi
+    except Exception:
+        result["wifi"] = {"present": False}
+
+    # ── Bluetooth ──────────────────────────────────────────────────────────────
+    try:
+        out = subprocess.check_output(
+            ["system_profiler", "SPBluetoothDataType"],
+            text=True, stderr=subprocess.DEVNULL
+        )
+        bt = {"present": True, "connected_devices": []}
+        in_connected = False
+        for line in out.splitlines():
+            s = line.strip()
+            if s.startswith("State:"):
+                bt["state"] = s.split(":", 1)[1].strip()
+            elif s.startswith("Chipset:"):
+                bt["chipset"] = s.split(":", 1)[1].strip()
+            elif s.startswith("Address:") and "address" not in bt:
+                bt["address"] = s.split(":", 1)[1].strip()
+            elif s.startswith("Firmware Version:") and "firmware" not in bt:
+                bt["firmware"] = s.split(":", 1)[1].strip()
+            elif s == "Connected:":
+                in_connected = True
+            elif s == "Not Connected:":
+                in_connected = False
+            elif in_connected and s.endswith(":") and s not in ("Connected:", "Not Connected:"):
+                dev_name = s.rstrip(":")
+                if dev_name:
+                    bt["connected_devices"].append(dev_name)
+        result["bluetooth"] = bt
+    except Exception:
+        result["bluetooth"] = {"present": False}
+
+    return result
+
+
+def _win_wifi_bluetooth():
+    result = {"wifi": {"present": False}, "bluetooth": {"present": False}}
+    try:
+        import wmi
+        c = wmi.WMI()
+        for adapter in c.Win32_NetworkAdapter():
+            name = (adapter.Name or "").lower()
+            if "wi-fi" in name or "wireless" in name or "802.11" in name or "wifi" in name:
+                result["wifi"] = {
+                    "present": True,
+                    "card_type": adapter.Name,
+                    "mac": adapter.MACAddress or "",
+                    "status": "Connected" if adapter.NetConnectionStatus == 2 else "Disconnected",
+                }
+                break
+        for dev in c.Win32_PnPEntity():
+            if (dev.PNPClass or "").lower() == "bluetooth":
+                result["bluetooth"] = {
+                    "present": True,
+                    "state": "On",
+                    "card_type": dev.Name,
+                    "connected_devices": [],
+                }
+                break
+    except Exception:
+        try:
+            out = subprocess.check_output(
+                ["netsh", "wlan", "show", "interfaces"],
+                text=True, stderr=subprocess.DEVNULL
+            )
+            if "Name" in out:
+                wifi = {"present": True, "connected_devices": []}
+                for line in out.splitlines():
+                    s = line.strip()
+                    if s.startswith("SSID") and "BSSID" not in s:
+                        wifi["ssid"] = s.split(":", 1)[1].strip()
+                    elif s.startswith("Signal"):
+                        wifi["signal_pct"] = s.split(":", 1)[1].strip()
+                    elif s.startswith("Radio type"):
+                        wifi["phy_modes"] = s.split(":", 1)[1].strip()
+                result["wifi"] = wifi
+        except Exception:
+            pass
+    return result
+
+
+def get_camera_mic_info():
+    """Tự động phát hiện camera và microphone."""
+    cameras, mics = [], []
+
+    if platform.system() == "Darwin":
+        cameras = _mac_cameras()
+        mics = _mac_mics()
+    elif platform.system() == "Windows":
+        cameras, mics = _win_camera_mic()
+
+    return {
+        "cameras": cameras,
+        "mics": mics,
+        "camera_ok": len(cameras) > 0,
+        "mic_ok": len(mics) > 0,
+    }
+
+
+def _mac_cameras():
+    """Liệt kê camera trên macOS qua system_profiler."""
+    cameras = []
+    try:
+        out = subprocess.check_output(
+            ["system_profiler", "SPCameraDataType"],
+            text=True, stderr=subprocess.DEVNULL
+        )
+        for line in out.splitlines():
+            s = line.strip()
+            if s.endswith(":") and s not in ("Camera:", "Cameras:") and len(s) > 2:
+                cameras.append(s.rstrip(":"))
+    except Exception:
+        pass
+    return cameras
+
+
+def _mac_mics():
+    """Liệt kê microphone (input device) trên macOS."""
+    mics = []
+    try:
+        out = subprocess.check_output(
+            ["system_profiler", "SPAudioDataType"],
+            text=True, stderr=subprocess.DEVNULL
+        )
+        current = None
+        is_input = False
+        for line in out.splitlines():
+            s = line.strip()
+            if s.endswith(":") and s not in ("Audio:", "Devices:"):
+                # Save previous device if it was an input device
+                if current and is_input:
+                    mics.append(current)
+                current = s.rstrip(":")
+                is_input = False
+            elif current and ("Input Channels" in s or "Default Input Device" in s):
+                is_input = True
+        if current and is_input:
+            mics.append(current)
+    except Exception:
+        pass
+    return mics
+
+
+def _win_camera_mic():
+    """Liệt kê camera và mic trên Windows."""
+    cameras, mics = [], []
+    try:
+        import wmi
+        c = wmi.WMI()
+        for dev in c.Win32_PnPEntity():
+            cls = (dev.PNPClass or "").lower()
+            if cls in ("camera", "image"):
+                cameras.append(dev.Name.strip())
+        for dev in c.Win32_SoundDevice():
+            mics.append(dev.Name.strip())
+    except ImportError:
+        try:
+            # wmic fallback
+            out = subprocess.check_output(
+                ["wmic", "path", "Win32_PnPEntity",
+                 "where", "PNPClass='Camera' OR PNPClass='Image'",
+                 "get", "Name", "/format:csv"],
+                text=True, stderr=subprocess.DEVNULL
+            )
+            for line in out.strip().splitlines():
+                parts = line.split(",")
+                if len(parts) >= 2 and parts[1].strip() and "Name" not in parts[1]:
+                    cameras.append(parts[1].strip())
+            out = subprocess.check_output(
+                ["wmic", "sounddev", "get", "Name", "/format:csv"],
+                text=True, stderr=subprocess.DEVNULL
+            )
+            for line in out.strip().splitlines():
+                parts = line.split(",")
+                if len(parts) >= 2 and parts[1].strip() and "Name" not in parts[1]:
+                    mics.append(parts[1].strip())
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return cameras, mics
+
+
 def collect_all():
     """Thu thập toàn bộ thông tin phần cứng."""
     print("Đang thu thập thông tin phần cứng...")
@@ -605,6 +854,7 @@ def collect_all():
         "battery": get_battery_info(),
         "gpu": get_gpu_info(),
         "display": get_display_info(),
+        "camera_mic": get_camera_mic_info(),
     }
 
     return data
