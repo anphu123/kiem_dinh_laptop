@@ -132,13 +132,19 @@ jobs:
           # Xóa quarantine flag khỏi bundle trước khi zip
           xattr -cr "$APP"
 
+      - name: Create launcher script
+        run: |
+          SCRIPT='#!/bin/bash\nDIR="$(cd "$(dirname "$0")" && pwd)"\nAPP="$DIR/O2O_Inspection.app"\nxattr -cr "$APP" 2>/dev/null\nopen "$APP"\n'
+          printf '%b' "$SCRIPT" > hardware_scanner/dist/Mo_App.command
+          chmod +x hardware_scanner/dist/Mo_App.command
+
       - name: Zip .app bundle
         run: |
           cd hardware_scanner/dist
           if [ -d "O2O_Inspection.app" ]; then
-            zip -ry O2O_Inspection_mac.zip O2O_Inspection.app
+            zip -ry O2O_Inspection_mac.zip O2O_Inspection.app Mo_App.command
           else
-            zip -ry O2O_Inspection_mac.zip O2O_Inspection
+            zip -ry O2O_Inspection_mac.zip O2O_Inspection Mo_App.command
           fi
 
       - name: Upload macOS artifact
@@ -185,15 +191,16 @@ jobs:
             2. Nếu SmartScreen hiện cảnh báo → click **"More info"** → **"Run anyway"**
             3. Hoặc: chuột phải vào file → **Properties** → tick **Unblock** → OK
 
-            **macOS — lần đầu mở:**
-            1. Giải nén zip → kéo `.app` vào thư mục Applications (hoặc để trên Desktop)
-            2. Mở **Terminal**, chạy lệnh sau để gỡ flag quarantine:
-               ```
-               xattr -cr ~/Desktop/O2O_Inspection.app
-               ```
-            3. Double-click `.app` để chạy bình thường
+            **macOS — lần đầu mở (2 cách):**
 
-            > Hoặc: chuột phải vào `.app` → **Open** → Open (bỏ qua cảnh báo Gatekeeper lần đầu)
+            **Cách 1 — Dùng script có sẵn (dễ nhất):**
+            1. Giải nén zip
+            2. Double-click `Mo_App.command` → nhấn **Open** khi macOS hỏi
+            3. App tự mở, không cần Terminal
+
+            **Cách 2 — Mở trực tiếp:**
+            1. Giải nén zip → kéo `O2O_Inspection.app` vào Applications
+            2. **Chuột phải** vào app → **Open** → **Open** (bỏ qua Gatekeeper lần đầu)
 
             ### Tính năng v2
             - **Wizard 5 bước tự động:** Scan → Màn hình → Camera/Mic/Loa → Bàn phím → Kiểm định ngoại quan
