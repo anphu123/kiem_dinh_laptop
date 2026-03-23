@@ -62,15 +62,22 @@ jobs:
             --hidden-import sounddevice `
             --uac-admin
 
-      - name: Unblock EXE (xóa Zone.Identifier ADS)
+      - name: Create Windows launcher & package zip
         working-directory: hardware_scanner/dist
-        run: Unblock-File -Path O2O_Inspection.exe
+        run: |
+          @"
+          @echo off
+          cd /d "%~dp0"
+          powershell -Command "Unblock-File -Path 'O2O_Inspection.exe'" 2>nul
+          start O2O_Inspection.exe
+          "@ | Out-File -FilePath Run_O2O.bat -Encoding ASCII
+          Compress-Archive -Path O2O_Inspection.exe,Run_O2O.bat -DestinationPath O2O_Inspection_win.zip -Force
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: O2O_Inspection_Windows
-          path: hardware_scanner/dist/O2O_Inspection.exe
+          path: hardware_scanner/dist/O2O_Inspection_win.zip
           retention-days: 30
 
   # ── Build macOS .app ────────────────────────────────────────────────────────
@@ -123,6 +130,14 @@ jobs:
             --hidden-import scanner \
             --hidden-import cv2 \
             --hidden-import sounddevice
+
+      - name: Add macOS privacy usage descriptions
+        run: |
+          PLIST=hardware_scanner/dist/O2O_Inspection.app/Contents/Info.plist
+          plutil -insert NSCameraUsageDescription \
+            -string "Dùng để kiểm tra camera laptop trong quá trình kiểm định." "$PLIST"
+          plutil -insert NSMicrophoneUsageDescription \
+            -string "Dùng để kiểm tra microphone laptop trong quá trình kiểm định." "$PLIST"
 
       - name: Ad-hoc sign & strip quarantine
         run: |
