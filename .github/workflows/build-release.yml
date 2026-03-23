@@ -46,6 +46,7 @@ jobs:
         run: |
           flet pack app.py `
             --name O2O_Inspection `
+            --icon icon.ico `
             --add-data "_embedded_key.py;." `
             --add-data "checklist.json;." `
             --hidden-import _embedded_key `
@@ -103,6 +104,7 @@ jobs:
         run: |
           flet pack app.py \
             --name O2O_Inspection \
+            --icon icon.icns \
             --codesign-identity - \
             --bundle-id com.o2o.laptop-inspection \
             --add-data "_embedded_key.py:." \

@@ -51,7 +51,7 @@ def _request_permissions_macos():
 
 
 def main(page: ft.Page):
-    page.title = "O2O Laptop Inspection"
+    page.title = "EASY SWAP LAPTOP"
     page.bgcolor = C["bg"]
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
