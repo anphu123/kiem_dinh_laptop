@@ -4,6 +4,7 @@ Runs scanner.py functions in a background thread, fires callbacks on main thread
 """
 from __future__ import annotations
 
+import platform
 import threading
 from datetime import datetime
 from typing import Callable, Optional
@@ -40,6 +41,26 @@ class ScanController:
         threading.Thread(target=self._run, daemon=True).start()
 
     def _run(self):
+        # Windows: WMI cần COM được khởi tạo trên mỗi thread
+        _com = False
+        if platform.system() == "Windows":
+            try:
+                import pythoncom
+                pythoncom.CoInitialize()
+                _com = True
+            except Exception:
+                pass
+        try:
+            self._run_steps()
+        finally:
+            if _com:
+                try:
+                    import pythoncom
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
+
+    def _run_steps(self):
         steps = [
             ("Thông tin hệ thống...", "system",     scanner.get_system_info),
             ("CPU...",               "cpu",         scanner.get_cpu_info),
