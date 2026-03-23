@@ -12,6 +12,8 @@ from typing import Optional
 class PricingResult:
     buy_min: Optional[int] = None
     buy_max: Optional[int] = None
+    sell_min: Optional[int] = None
+    sell_max: Optional[int] = None
     summary: str = ""
     strengths: list = field(default_factory=list)   # list[str]
     weaknesses: list = field(default_factory=list)  # list[str]
@@ -27,6 +29,8 @@ class PricingResult:
         return cls(
             buy_min=data.get("buy_min"),
             buy_max=data.get("buy_max"),
+            sell_min=data.get("sell_min"),
+            sell_max=data.get("sell_max"),
             summary=data.get("summary", ""),
             strengths=data.get("strengths", []),
             weaknesses=data.get("weaknesses", []),
@@ -45,12 +49,13 @@ class PricingResult:
     @property
     def copy_text(self) -> str:
         if self.has_prices:
-            buy_lo = f"{self.buy_min:,.0f}".replace(",", ".")
-            buy_hi = f"{self.buy_max:,.0f}".replace(",", ".")
+            def _fmt(v): return f"{v:,.0f}".replace(",", ".")
             lines = []
             if self.summary:
                 lines.append(self.summary)
-            lines.append(f"Thu mua: {buy_lo} – {buy_hi} đ")
+            lines.append(f"Thu mua: {_fmt(self.buy_min)} – {_fmt(self.buy_max)} đ")
+            if self.sell_min and self.sell_max:
+                lines.append(f"Bán ra: {_fmt(self.sell_min)} – {_fmt(self.sell_max)} đ")
             if self.strengths:
                 lines.append("Điểm cộng: " + "; ".join(self.strengths))
             if self.weaknesses:

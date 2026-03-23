@@ -57,23 +57,13 @@ class ChecklistTab:
         self._sync_borders()
 
     def _on_answer(self, qid: str, idx: int):
-        # 1. Sync Python-side value cho card vừa click
+        # Cập nhật visual state cho card vừa click
         if qid in self._cards:
             self._cards[qid].radio_group.value = str(idx)
 
-        # 2. Quét toàn bộ visual state → ghi vào controller một lần.
-        #    Đây là safety net: nếu on_change bị miss cho bất kỳ card nào,
-        #    lần click tiếp theo sẽ đồng bộ lại tất cả.
-        visual = {}
-        for card_qid, card in self._cards.items():
-            val = card.radio_group.value
-            if val is not None:
-                try:
-                    visual[card_qid] = int(val)
-                except (ValueError, TypeError):
-                    pass
-
-        self._ctrl.sync_from_visual(visual)
+        # Ghi trực tiếp vào controller — không scan toàn bộ cards
+        # (scan-replace gây mất câu đã trả lời nếu rg.value chưa được sync)
+        self._ctrl.answer(qid, idx)
         self._sync_borders()
         self._page.update()
 

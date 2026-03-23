@@ -90,11 +90,14 @@ Xếp hạng : {grade}  |  Tổng điểm phạt: {score}
 {cl_summary}
 
 === YÊU CẦU OUTPUT ===
-Trả về JSON hợp lệ (không có text thừa, không có markdown), đơn vị giá là VNĐ nguyên (số nguyên):
+Trả về JSON thuần túy (KHÔNG có markdown, KHÔNG có ```json, KHÔNG có text thừa).
+Đơn vị giá là VNĐ nguyên (số nguyên, không có dấu phẩy, không có chữ):
 
 {{
-  "buy_min": <giá thu mua thấp nhất, số nguyên VNĐ>,
-  "buy_max": <giá thu mua cao nhất, số nguyên VNĐ>,
+  "buy_min": <giá thu mua thấp nhất>,
+  "buy_max": <giá thu mua cao nhất>,
+  "sell_min": <giá bán ra thấp nhất (= thu mua + biên lợi nhuận)>,
+  "sell_max": <giá bán ra cao nhất>,
   "summary": "<đánh giá tổng quan 1-2 câu>",
   "strengths": ["<điểm mạnh 1>", "<điểm mạnh 2>"],
   "weaknesses": ["<điểm yếu 1>", "<điểm yếu 2>"],
@@ -105,26 +108,65 @@ Trả về JSON hợp lệ (không có text thừa, không có markdown), đơn 
 
 
 def parse_result(raw: str) -> dict:
-    """Parse JSON từ response Gemini. Fallback về dict rỗng nếu lỗi."""
+    """Parse JSON từ response Gemini. Fallback regex nếu JSON malformed."""
+    import re as _re
+
     text = raw.strip()
-    # Bỏ markdown code block nếu có
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
+
+    # Strip markdown code fence (```json ... ``` hoặc ``` ... ```)
+    text = _re.sub(r"^```[a-zA-Z]*\s*", "", text)
+    text = _re.sub(r"\s*```\s*$", "", text)
     text = text.strip()
+
+    # 1. Parse toàn bộ JSON
     try:
-        return json.loads(text)
+        data = json.loads(text)
+        if isinstance(data, dict) and set(data.keys()) != {"_raw"}:
+            return data
     except Exception:
-        # Thử tìm JSON object trong text
-        start = text.find("{")
-        end   = text.rfind("}") + 1
-        if start >= 0 and end > start:
-            try:
-                return json.loads(text[start:end])
-            except Exception:
-                pass
-        return {"_raw": raw}  # fallback giữ text gốc
+        pass
+
+    # 2. Trích JSON object đầu tiên trong text
+    start = text.find("{")
+    end   = text.rfind("}") + 1
+    if start >= 0 and end > start:
+        try:
+            data = json.loads(text[start:end])
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
+    # 3. Regex fallback — extract từng field ngay cả khi JSON bị lỗi
+    def _int(pat: str):
+        m = _re.search(pat, raw)
+        return int(m.group(1)) if m else None
+
+    def _str(pat: str):
+        m = _re.search(pat, raw, _re.DOTALL)
+        return m.group(1).strip() if m else ""
+
+    def _list(pat: str):
+        m = _re.search(pat, raw, _re.DOTALL)
+        if not m:
+            return []
+        items = _re.findall(r'"([^"]+)"', m.group(1))
+        return items
+
+    buy_min = _int(r'"buy_min"\s*:\s*(\d+)')
+    if buy_min is None:
+        return {"_raw": raw}   # Không có gì để extract
+
+    return {
+        "buy_min":   buy_min,
+        "buy_max":   _int(r'"buy_max"\s*:\s*(\d+)'),
+        "sell_min":  _int(r'"sell_min"\s*:\s*(\d+)'),
+        "sell_max":  _int(r'"sell_max"\s*:\s*(\d+)'),
+        "summary":   _str(r'"summary"\s*:\s*"((?:[^"\\]|\\.)*)"'),
+        "strengths": _list(r'"strengths"\s*:\s*\[([^\]]*)\]'),
+        "weaknesses":_list(r'"weaknesses"\s*:\s*\[([^\]]*)\]'),
+        "reasoning": _str(r'"reasoning"\s*:\s*"((?:[^"\\]|\\.)*)"'),
+    }
 
 
 def get_price_estimate(hw: dict, answers: dict, checklist: list,

@@ -1,6 +1,6 @@
 """
-Component: AI pricing panel — giao diện định giá thu mua laptop cũ.
-Thiết kế rõ ràng, phân cấp thông tin: Giá thu mua (chính) → Giá bán ra → Phân tích.
+Component: AI pricing panel — redesigned.
+Layout: header → 2 price cards (thu mua / bán ra) → phân tích → copy button.
 """
 from __future__ import annotations
 
@@ -31,25 +31,28 @@ def _header(retry_cb: Optional[Callable]) -> ft.Control:
     if retry_cb:
         actions.append(ft.IconButton(
             icon=ft.Icons.REFRESH_ROUNDED,
-            icon_size=16,
+            icon_size=15,
             icon_color="white",
             tooltip="Định giá lại",
             on_click=lambda _: retry_cb(),
-            style=ft.ButtonStyle(padding=ft.padding.all(4)),
+            style=ft.ButtonStyle(padding=ft.padding.all(2)),
         ))
 
     return ft.Container(
         content=ft.Row([
             ft.Row([
-                ft.Text("✦", size=13, color="#E9D5FF"),
-                ft.Text("AI  ĐỊNH  GIÁ", size=11,
-                        weight=ft.FontWeight.BOLD, color="white",
-                        letter_spacing=1.2),
-            ], spacing=6),
+                ft.Text("✦", size=12, color="#DDD6FE"),
+                ft.Text("AI  ĐỊNH  GIÁ", size=10,
+                        weight=ft.FontWeight.BOLD, color="white"),
+            ], spacing=5),
             *actions,
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-        bgcolor="#6D28D9",
-        padding=ft.padding.symmetric(horizontal=12, vertical=8),
+        gradient=ft.LinearGradient(
+            begin=ft.alignment.center_left,
+            end=ft.alignment.center_right,
+            colors=["#5B21B6", "#7C3AED"],
+        ),
+        padding=ft.padding.symmetric(horizontal=12, vertical=7),
     )
 
 
@@ -72,26 +75,13 @@ def _body(
 def _loading() -> ft.Control:
     return ft.Container(
         content=ft.Column([
-            ft.Container(
-                content=ft.Column([
-                    ft.ProgressRing(
-                        width=32, height=32, stroke_width=3,
-                        color="#7C3AED",
-                    ),
-                    ft.Text("Gemini đang phân tích...", size=10,
-                            color="#7C3AED", text_align=ft.TextAlign.CENTER),
-                    ft.Text("Vui lòng chờ vài giây",
-                            size=9, color=C["dim"],
-                            text_align=ft.TextAlign.CENTER),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
-                alignment=ft.alignment.center,
-                padding=ft.padding.symmetric(vertical=24),
-            ),
-        ]),
+            ft.ProgressRing(width=28, height=28, stroke_width=3, color="#7C3AED"),
+            ft.Text("Gemini đang phân tích...", size=10,
+                    color="#7C3AED", text_align=ft.TextAlign.CENTER),
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
+        alignment=ft.alignment.center,
+        padding=ft.padding.symmetric(vertical=20),
         bgcolor="#F5F3FF",
-        border=ft.border.only(
-            left=ft.border.BorderSide(3, "#7C3AED"),
-        ),
     )
 
 
@@ -99,10 +89,10 @@ def _error(error: str) -> ft.Control:
     return ft.Container(
         content=ft.Column([
             ft.Row([
-                ft.Icon(ft.Icons.ERROR_OUTLINE_ROUNDED, size=16, color=C["red"]),
+                ft.Icon(ft.Icons.ERROR_OUTLINE_ROUNDED, size=14, color=C["red"]),
                 ft.Text("Không định giá được", size=10,
                         weight=ft.FontWeight.BOLD, color=C["red"]),
-            ], spacing=6),
+            ], spacing=5),
             ft.Text(error[:120], size=9, color=C["dim"]),
         ], spacing=4),
         padding=ft.padding.all(12),
@@ -114,91 +104,116 @@ def _error(error: str) -> ft.Control:
 def _result(p: PricingResult, copy_cb: Optional[Callable]) -> ft.Control:
     items: list = []
 
-    # ── Giá thu mua (hero) ────────────────────────────────────────────────────
-    buy_lo = _fmt(p.buy_min)
-    buy_hi = _fmt(p.buy_max)
+    # ── 2 price cards ────────────────────────────────────────────────────────
+    buy_card  = _price_card(
+        label="THU MUA",
+        icon=ft.Icons.ARROW_DOWNWARD_ROUNDED,
+        lo=p.buy_min, hi=p.buy_max,
+        bg="#DCFCE7", border_color="#86EFAC",
+        text_color="#15803D", sub_color="#166534",
+    )
+    sell_card = _price_card(
+        label="BÁN RA",
+        icon=ft.Icons.ARROW_UPWARD_ROUNDED,
+        lo=p.sell_min, hi=p.sell_max,
+        bg="#EFF6FF", border_color="#93C5FD",
+        text_color="#1D4ED8", sub_color="#1E40AF",
+    )
     items.append(ft.Container(
-        content=ft.Column([
-            ft.Row([
-                ft.Icon(ft.Icons.ARROW_DOWNWARD_ROUNDED,
-                        size=13, color="#15803D"),
-                ft.Text("GIÁ THU MUA", size=9,
-                        weight=ft.FontWeight.BOLD,
-                        color="#15803D", letter_spacing=0.8),
-            ], spacing=4),
-            ft.Row([
-                ft.Text(buy_lo, size=22,
-                        weight=ft.FontWeight.BOLD, color="#15803D"),
-                ft.Text("đ", size=13, color="#15803D",
-                        weight=ft.FontWeight.BOLD),
-            ], spacing=3, vertical_alignment=ft.CrossAxisAlignment.END),
-            ft.Row([
-                ft.Text("đến", size=10, color="#166534"),
-                ft.Text(f"{buy_hi} đ", size=13,
-                        weight=ft.FontWeight.BOLD, color="#166534"),
-            ], spacing=4),
-        ], spacing=2),
-        bgcolor="#DCFCE7",
-        border=ft.border.all(1, "#86EFAC"),
-        border_radius=8,
-        padding=ft.padding.symmetric(horizontal=14, vertical=10),
-        margin=ft.margin.only(left=8, right=8, top=8, bottom=4),
+        content=ft.Row([buy_card, sell_card], spacing=6,
+                       expand=True),
+        padding=ft.padding.only(left=8, right=8, top=8, bottom=4),
     ))
 
-    # ── Divider ───────────────────────────────────────────────────────────────
-    items.append(ft.Divider(height=1, color=C["border"]))
-
-    # ── Tóm tắt ───────────────────────────────────────────────────────────────
+    # ── Summary ───────────────────────────────────────────────────────────────
     if p.summary:
         items.append(ft.Container(
-            content=ft.Text(p.summary, size=10, color=C["text"],
-                            italic=True),
-            padding=ft.padding.symmetric(horizontal=10, vertical=6),
+            content=ft.Text(p.summary, size=9, color=C["text"], italic=True),
+            padding=ft.padding.only(left=10, right=10, top=4, bottom=2),
         ))
 
-    # ── Điểm cộng ─────────────────────────────────────────────────────────────
+    items.append(ft.Divider(height=1, color=C["border"]))
+
+    # ── Điểm cộng / điểm trừ ─────────────────────────────────────────────────
     if p.strengths:
-        items.append(_section_label("✅  Điểm cộng", "#15803D"))
-        for s in p.strengths:
-            items.append(_bullet(s, C["green"], "•"))
-
-    # ── Điểm trừ ──────────────────────────────────────────────────────────────
+        items.append(_tag_row("✅", p.strengths, "#15803D", "#DCFCE7"))
     if p.weaknesses:
-        items.append(_section_label("⚠️  Điểm trừ", "#92400E"))
-        for w in p.weaknesses:
-            items.append(_bullet(w, C["yellow"], "•"))
+        items.append(_tag_row("⚠️", p.weaknesses, "#92400E", "#FEF9C3"))
 
-    # ── Lý do định giá (collapsible) ──────────────────────────────────────────
+    # ── Reasoning ────────────────────────────────────────────────────────────
     if p.reasoning:
-        items.append(ft.Divider(height=1, color=C["border"]))
         items.append(ft.Container(
-            content=ft.Text(p.reasoning, size=9, color=C["dim"],
-                            italic=True),
-            padding=ft.padding.symmetric(horizontal=10, vertical=6),
+            content=ft.Text(p.reasoning, size=9, color=C["dim"], italic=True),
+            padding=ft.padding.only(left=10, right=10, top=4, bottom=4),
         ))
 
-    # ── Copy button ───────────────────────────────────────────────────────────
+    # ── Copy button ──────────────────────────────────────────────────────────
     items.append(ft.Divider(height=1, color=C["border"]))
     copy_text = p.copy_text
     items.append(ft.Container(
         content=ft.ElevatedButton(
             content=ft.Row([
-                ft.Icon(ft.Icons.COPY_ALL_ROUNDED, size=14, color="white"),
+                ft.Icon(ft.Icons.COPY_ALL_ROUNDED, size=13, color="white"),
                 ft.Text("Copy kết quả", size=10, color="white",
                         weight=ft.FontWeight.BOLD),
-            ], spacing=6, tight=True),
+            ], spacing=5, tight=True),
             on_click=lambda _, t=copy_text: copy_cb(t) if copy_cb else None,
             bgcolor="#6D28D9",
             style=ft.ButtonStyle(
-                padding=ft.padding.symmetric(horizontal=14, vertical=8),
+                padding=ft.padding.symmetric(horizontal=12, vertical=7),
                 shape=ft.RoundedRectangleBorder(radius=6),
             ),
         ),
         alignment=ft.alignment.center,
-        padding=ft.padding.symmetric(vertical=8),
+        padding=ft.padding.symmetric(vertical=7),
     ))
 
     return ft.Column(items, spacing=0)
+
+
+def _price_card(
+    label: str, icon, lo: Optional[int], hi: Optional[int],
+    bg: str, border_color: str, text_color: str, sub_color: str,
+) -> ft.Control:
+    lo_str = _fmt(lo)
+    hi_str = _fmt(hi)
+    return ft.Container(
+        content=ft.Column([
+            ft.Row([
+                ft.Icon(icon, size=11, color=text_color),
+                ft.Text(label, size=8, weight=ft.FontWeight.BOLD,
+                        color=text_color),
+            ], spacing=3),
+            ft.Text(lo_str, size=16, weight=ft.FontWeight.BOLD,
+                    color=text_color),
+            ft.Row([
+                ft.Text("đến", size=8, color=sub_color),
+                ft.Text(f"{hi_str} đ", size=10,
+                        weight=ft.FontWeight.BOLD, color=sub_color),
+            ], spacing=3),
+        ], spacing=2, horizontal_alignment=ft.CrossAxisAlignment.START),
+        bgcolor=bg,
+        border=ft.border.all(1, border_color),
+        border_radius=8,
+        padding=ft.padding.symmetric(horizontal=10, vertical=8),
+        expand=True,
+    )
+
+
+def _tag_row(emoji: str, items: list, text_color: str, bg: str) -> ft.Control:
+    """Hiển thị list điểm mạnh/yếu dạng tags nhỏ."""
+    tags = []
+    for item in items[:3]:          # tối đa 3 tags
+        tags.append(ft.Container(
+            content=ft.Text(f"{emoji} {item}", size=8, color=text_color),
+            bgcolor=bg,
+            border_radius=4,
+            padding=ft.padding.symmetric(horizontal=6, vertical=2),
+        ))
+    return ft.Container(
+        content=ft.Column(tags, spacing=3),
+        padding=ft.padding.only(left=10, right=8, top=4, bottom=2),
+    )
 
 
 def _raw_fallback(raw: str) -> ft.Control:
@@ -206,19 +221,18 @@ def _raw_fallback(raw: str) -> ft.Control:
     return ft.Container(
         content=ft.Column([
             ft.Row([
-                ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED,
-                        size=14, color=C["yellow"]),
-                ft.Text("Kết quả thô từ Gemini", size=10,
+                ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED, size=13, color=C["yellow"]),
+                ft.Text("Kết quả thô từ Gemini", size=9,
                         color=C["yellow"], weight=ft.FontWeight.BOLD),
-            ], spacing=6),
+            ], spacing=5),
             ft.Container(
-                content=ft.Text(raw[:400] if raw else "Không có dữ liệu",
-                                size=9, color=C["dim"]),
+                content=ft.Text(raw[:300] if raw else "Không có dữ liệu",
+                                size=8, color=C["dim"]),
                 bgcolor=C["card2"],
-                border_radius=6,
-                padding=ft.padding.all(8),
+                border_radius=5,
+                padding=ft.padding.all(7),
             ),
-        ], spacing=6),
+        ], spacing=5),
         padding=ft.padding.all(10),
     )
 
@@ -229,21 +243,3 @@ def _fmt(val: Optional[int]) -> str:
     if val is None:
         return "—"
     return f"{val:,.0f}".replace(",", ".")
-
-
-def _section_label(text: str, color: str) -> ft.Control:
-    return ft.Container(
-        content=ft.Text(text, size=9, weight=ft.FontWeight.BOLD,
-                        color=color),
-        padding=ft.padding.only(left=10, top=6, bottom=2),
-    )
-
-
-def _bullet(text: str, color: str, symbol: str = "•") -> ft.Control:
-    return ft.Container(
-        content=ft.Row([
-            ft.Text(symbol, size=10, color=color),
-            ft.Text(text, size=9, color=C["text"], expand=True),
-        ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.START),
-        padding=ft.padding.only(left=14, right=8, bottom=3),
-    )
