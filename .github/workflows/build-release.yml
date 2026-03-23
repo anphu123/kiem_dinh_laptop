@@ -102,6 +102,8 @@ jobs:
         run: |
           flet pack app.py \
             --name O2O_Inspection \
+            --codesign-identity - \
+            --bundle-id com.o2o.laptop-inspection \
             --add-data "_embedded_key.py:." \
             --add-data "checklist.json:." \
             --hidden-import _embedded_key \
@@ -117,14 +119,21 @@ jobs:
             --hidden-import cv2 \
             --hidden-import sounddevice
 
+      - name: Ad-hoc sign & strip quarantine
+        run: |
+          APP=hardware_scanner/dist/O2O_Inspection.app
+          # Deep sign toàn bộ bundle (bao gồm frameworks, dylibs)
+          codesign --force --deep --sign - "$APP"
+          # Xóa quarantine flag khỏi bundle trước khi zip
+          xattr -cr "$APP"
+
       - name: Zip .app bundle
         run: |
           cd hardware_scanner/dist
-          # flet pack tạo thư mục app, zip toàn bộ
           if [ -d "O2O_Inspection.app" ]; then
-            zip -r O2O_Inspection_mac.zip O2O_Inspection.app
+            zip -ry O2O_Inspection_mac.zip O2O_Inspection.app
           else
-            zip -r O2O_Inspection_mac.zip O2O_Inspection
+            zip -ry O2O_Inspection_mac.zip O2O_Inspection
           fi
 
       - name: Upload macOS artifact
@@ -166,12 +175,20 @@ jobs:
             | `O2O_Inspection_mac.zip` | macOS 12+ (Intel & Apple Silicon) |
 
             ### Cách dùng
-            **Windows:** Double-click `O2O_Inspection.exe` — không cần cài Python, không cần .env
+            **Windows:** Double-click `O2O_Inspection.exe` — không cần cài Python
 
-            **macOS:** Giải nén zip → chuột phải vào `.app` → Open (lần đầu bỏ qua cảnh báo Gatekeeper)
+            **macOS — lần đầu mở:**
+            1. Giải nén zip → kéo `.app` vào thư mục Applications (hoặc để trên Desktop)
+            2. Mở **Terminal**, chạy lệnh sau để gỡ flag quarantine:
+               ```
+               xattr -cr ~/Desktop/O2O_Inspection.app
+               ```
+            3. Double-click `.app` để chạy bình thường
+
+            > Hoặc: chuột phải vào `.app` → **Open** → Open (bỏ qua cảnh báo Gatekeeper lần đầu)
 
             ### Tính năng v2
-            - **Wizard 6 bước tự động:** Scan → Bảo hành → Màn hình → Camera/Mic/Loa → Bàn phím → Kiểm định ngoại quan
+            - **Wizard 5 bước tự động:** Scan → Màn hình → Camera/Mic/Loa → Bàn phím → Kiểm định ngoại quan
             - **Transaction ID** mỗi phiên kiểm tra
             - **Màn hình fullscreen** test 7 màu (điểm chết, sọc màu)
             - **Camera auto-test** khi bước camera được kích hoạt
@@ -181,7 +198,6 @@ jobs:
 
             ### Lưu ý
             - Chạy với quyền Admin/sudo để đọc đầy đủ BIOS, pin, serial
-            - Tính năng tra cứu bảo hành TGDD cần kết nối internet
           files: |
             release/O2O_Inspection.exe
             release/O2O_Inspection_mac.zip
